@@ -245,33 +245,19 @@ Each stack has its own CI workflow that **only triggers when its files change** 
 
 ### `.github/workflows/contract.yml`
 
-```yaml
-on:
-  push:
-    paths: ["contract/**"]
-  pull_request:
-    paths: ["contract/**"]
-```
-
 | Trigger | Job | Timeout |
 |---------|-----|---------|
-| Any commit touching `contract/**` | `npx hardhat test` (Node.js 20) | 5 min |
+| Any push touching `contract/**` (any branch) | `npx hardhat test` (Node.js 20) | 5 min |
+| PR to `main` touching `contract/**` | Same | 5 min |
 
-Only fires when the Solidity dev pushes contract changes. Caches `node_modules` via npm.
+Caches `node_modules` via npm.
 
 ### `.github/workflows/backend.yml`
 
-```yaml
-on:
-  push:
-    paths: ["backend/**"]
-  pull_request:
-    paths: ["backend/**"]
-```
-
 | Trigger | Job | Timeout |
 |---------|-----|---------|
-| Any commit touching `backend/**` | `pytest tests/ -v` (Python 3.11) | 10 min |
+| Any push touching `backend/**` (any branch) | `pytest tests/ -v` (Python 3.11) | 10 min |
+| PR to `main` touching `backend/**` | Same | 10 min |
 
 Runs all backend tests in SQLite mode. RLS boundary tests run only if `OILTRACE_TEST_DB=postgres` is set. Caches pip packages.
 

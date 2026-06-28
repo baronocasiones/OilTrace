@@ -83,8 +83,8 @@ Two separate workflows that only trigger when their stack changes:
 
 | Workflow | Trigger | Runs |
 |----------|---------|------|
-| `contract.yml` | `contract/**` | `npx hardhat test` |
-| `backend.yml` | `backend/**` | `pytest tests/ -v` |
+| `contract.yml` | Any push or PR touching `contract/**` | `npx hardhat test` |
+| `backend.yml` | Any push or PR touching `backend/**` | `pytest tests/ -v` |
 
 Changes to `docs/`, `mobile/`, `hardware/` do not trigger CI.
 
