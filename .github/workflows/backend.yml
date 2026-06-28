@@ -1,39 +1,17 @@
-name: OilTrace CI
+name: Backend CI
 
 on:
   push:
     branches: [main, develop]
+    paths: ["backend/**"]
   pull_request:
     branches: [main]
+    paths: ["backend/**"]
 
 env:
   OILTRACE_TEST_DB: sqlite
-  ETH_RPC_URL: ${{ vars.ETH_RPC_URL || 'http://localhost:8545' }}
 
 jobs:
-  contract-tests:
-    name: Solidity Contract Tests
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: contract
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "npm"
-          cache-dependency-path: contract/package.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run Hardhat tests
-        run: npx hardhat test
-        timeout-minutes: 5
-
   backend-tests:
     name: Backend Unit Tests
     runs-on: ubuntu-latest

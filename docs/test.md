@@ -239,18 +239,45 @@ async def test_register_device_token(self, client):
 
 ---
 
-## CI Pipeline (`.github/workflows/test.yml`)
+## CI Pipeline (two workflow files)
 
-Triggered on push to `main`/`develop` and pull requests to `main`. Two parallel jobs:
+Each stack has its own CI workflow that **only triggers when its files change** — so pushing docs or hardware code won't fire false failures on unrelated test suites.
 
+### `.github/workflows/contract.yml`
+
+```yaml
+on:
+  push:
+    paths: ["contract/**"]
+  pull_request:
+    paths: ["contract/**"]
 ```
-Git Push ──┬── contract-tests (Node.js 20, npx hardhat test) ──── 5 min timeout
-           └── backend-tests  (Python 3.11, pytest) ─────────────── 10 min timeout
-                   ├── pytest tests/ -v (ignoring RLS)
-                   └── pytest test_rls_boundaries.py -v (if OILTRACE_TEST_DB=postgres)
+
+| Trigger | Job | Timeout |
+|---------|-----|---------|
+| Any commit touching `contract/**` | `npx hardhat test` (Node.js 20) | 5 min |
+
+Only fires when the Solidity dev pushes contract changes. Caches `node_modules` via npm.
+
+### `.github/workflows/backend.yml`
+
+```yaml
+on:
+  push:
+    paths: ["backend/**"]
+  pull_request:
+    paths: ["backend/**"]
 ```
 
-Both jobs run on `ubuntu-latest` with dependency caching (npm cache, pip cache).
+| Trigger | Job | Timeout |
+|---------|-----|---------|
+| Any commit touching `backend/**` | `pytest tests/ -v` (Python 3.11) | 10 min |
+
+Runs all backend tests in SQLite mode. RLS boundary tests run only if `OILTRACE_TEST_DB=postgres` is set. Caches pip packages.
+
+### What doesn't fire CI
+
+Pushing changes to `docs/`, `hardware/`, `mobile/`, root `.md` files, or anything outside `backend/` and `contract/` — **no CI runs**. Clean green checks across the board.
 
 ---
 

@@ -1,0 +1,33 @@
+name: Contract CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths: ["contract/**"]
+  pull_request:
+    branches: [main]
+    paths: ["contract/**"]
+
+jobs:
+  contract-tests:
+    name: Solidity Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contract
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: contract/package.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Hardhat tests
+        run: npx hardhat test
+        timeout-minutes: 5
