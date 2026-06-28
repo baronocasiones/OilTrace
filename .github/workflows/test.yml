@@ -1,0 +1,66 @@
+name: OilTrace CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  OILTRACE_TEST_DB: sqlite
+  ETH_RPC_URL: ${{ vars.ETH_RPC_URL || 'http://localhost:8545' }}
+
+jobs:
+  contract-tests:
+    name: Solidity Contract Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contract
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: contract/package.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Hardhat tests
+        run: npx hardhat test
+        timeout-minutes: 5
+
+  backend-tests:
+    name: Backend Unit Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements*.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt 2>/dev/null || pip install pytest pytest-asyncio httpx
+          pip install web3 2>/dev/null || true
+
+      - name: Run backend unit tests
+        run: python -m pytest tests/ -v --ignore=tests/test_rls_boundaries.py
+        timeout-minutes: 10
+
+      - name: Run RLS boundary tests (if PostgreSQL available)
+        if: env.OILTRACE_TEST_DB == 'postgres'
+        run: python -m pytest tests/test_rls_boundaries.py -v
+        timeout-minutes: 5
