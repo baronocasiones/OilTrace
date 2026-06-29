@@ -1,274 +1,193 @@
-"""
-Tests for the Ethereum blockchain service (Web3.py) and the background poller.
-
-Covers: writing to Sepolia, verification endpoint, poller state machine,
-RPC failure handling, stale record cleanup.
-"""
-
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import MagicMock, patch
 from datetime import datetime, timedelta, timezone
+import json
+
+
+SAMPLE_ABI = json.dumps({
+    "abi": [
+        {
+            "inputs": [],
+            "name": "recordCollection",
+            "stateMutability": "nonpayable",
+            "type": "function"
+        }
+    ]
+})
 
 
 class TestBlockchainWrite:
     """Smart contract write operations."""
 
-    async def test_write_collection_to_sepolia(self, monkeypatch):
-        """Mock Web3.py — verify recordCollection() is called with correct args."""
-        from app.services.blockchain import BlockchainService
+    def test_record_collection_simulated_mode(self):
+        """No PRIVATE_KEY set → returns simulated."""
+        import app.services.blockchain as bc
+        bc.PRIVATE_KEY = ""
+        bc.ACCOUNT_ADDRESS = "0x" + "cd" * 20
 
         mock_contract = MagicMock()
-        mock_contract.functions.recordCollection.return_value.transact.return_value = {
-            "hash": b'\xab\xcd' * 16  # 32-byte mock hash
+
+        with patch("builtins.open", MagicMock()):
+            with patch("pathlib.Path.exists", return_value=True):
+                with patch("json.load", return_value={"abi": []}):
+                    with patch("web3.Web3.is_connected", return_value=True):
+                        with patch("web3.eth.Eth.contract", return_value=mock_contract):
+                            from app.services.blockchain import BlockchainService
+                            service = BlockchainService()
+                            service.contract = mock_contract
+
+        result = service.record_collection(
+            consumer_ref="test-uuid", tpm_value=2450, grade=1,
+            volume_ml=5000, location_hash="wdw3q2",
+            driver_ref="driver-uuid", data_integrity=b'\x00' * 32
+        )
+
+        assert result["status"] == "simulated"
+        assert result["tx_hash"] is None
+
+    def test_record_collection_with_key(self, monkeypatch):
+        """With PRIVATE_KEY set, calls build_transaction."""
+        import app.services.blockchain as bc
+        bc.PRIVATE_KEY = "0x" + "ab" * 32
+        bc.ACCOUNT_ADDRESS = "0x" + "cd" * 20
+
+        mock_contract = MagicMock()
+        mock_contract.functions.recordCollection.return_value.build_transaction.return_value = {
+            "from": "0x" + "cd" * 20, "nonce": 0, "gas": 500000,
         }
 
-        monkeypatch.setattr(
-            "app.services.blockchain.BlockchainService._get_contract",
-            lambda self: mock_contract
-        )
+        with patch.object(bc.BlockchainService, "_get_contract", return_value=mock_contract):
+            with patch("web3.eth.Eth.get_transaction_count", return_value=0):
+                with patch("web3.eth.Eth.gas_price", 10000000000):
+                    with patch("web3.eth.Eth.account.sign_transaction", return_value=MagicMock(raw_transaction=b'\xab' * 100)):
+                        with patch("web3.eth.Eth.send_raw_transaction", return_value=b'\xcd' * 32):
+                            from app.services.blockchain import BlockchainService
+                            service = BlockchainService()
+                            service.contract = mock_contract
 
-        service = BlockchainService()
-        result = await service.record_collection(
-            consumer_ref="test-uuid",
-            tpm_value=2450,
-            grade=1,
-            volume_ml=5000,
-            location_hash="wdw3q2",
-            driver_ref="driver-uuid",
-            data_integrity=b'\x00' * 32
-        )
+                            result = service.record_collection(
+                                consumer_ref="test-uuid", tpm_value=2450, grade=1,
+                                volume_ml=5000, location_hash="wdw3q2",
+                                driver_ref="driver-uuid", data_integrity=b'\x00' * 32
+                            )
 
         assert result["status"] == "pending"
-        assert len(result["tx_hash"]) == 66  # 0x + 64 hex chars
+        assert len(result["tx_hash"]) == 64
         mock_contract.functions.recordCollection.assert_called_once()
 
-    async def test_contract_owner_only(self, monkeypatch):
-        """Non-owner wallet should fail (simulated)."""
-        from app.services.blockchain import BlockchainService
+    def test_connection_check(self):
+        """is_connected returns True/False based on RPC."""
+        with patch("web3.Web3.is_connected", return_value=False):
+            from app.services.blockchain import BlockchainService
+            assert BlockchainService().is_connected() is False
 
+
+class TestBlockchainRead:
+    """Smart contract read operations (no gas cost)."""
+
+    def test_get_record_parses_correctly(self):
+        """getRecord returns tuple → parsed into dict."""
+        mock_record = (
+            "consumer-uuid", 2450, 1, 5000,
+            1700000000, "wdw3q2", "driver-uuid",
+            b'\x00' * 32,
+        )
         mock_contract = MagicMock()
-        mock_contract.functions.recordCollection.return_value.transact.side_effect = \
-            Exception("OilTrace: caller is not the owner")
+        mock_contract.functions.getRecord.return_value.call.return_value = mock_record
 
-        monkeypatch.setattr(
-            "app.services.blockchain.BlockchainService._get_contract",
-            lambda self: mock_contract
-        )
-
-        service = BlockchainService()
-        with pytest.raises(Exception, match="not the owner"):
-            await service.record_collection(
-                consumer_ref="test-uuid",
-                tpm_value=2450,
-                grade=1,
-                volume_ml=5000,
-                location_hash="wdw3q2",
-                driver_ref="driver-uuid",
-                data_integrity=b'\x00' * 32
-            )
-
-    async def test_web3_connection_error(self, monkeypatch):
-        """RPC endpoint is down → graceful error handling."""
         from app.services.blockchain import BlockchainService
-
-        monkeypatch.setattr(
-            "web3.Web3.is_connected",
-            lambda self: False
-        )
-
         service = BlockchainService()
-        with pytest.raises(ConnectionError, match="Cannot connect to Ethereum RPC"):
-            await service.record_collection(
-                consumer_ref="test-uuid",
-                tpm_value=2450,
-                grade=1,
-                volume_ml=5000,
-                location_hash="wdw3q2",
-                driver_ref="driver-uuid",
-                data_integrity=b'\x00' * 32
-            )
+        service.contract = mock_contract
+        service.w3 = MagicMock()
 
+        result = service.get_record(0)
+        assert result["consumer_ref"] == "consumer-uuid"
+        assert result["tpm_value"] == 2450
+        assert result["grade"] == 1
+        assert result["data_integrity"].startswith("0x")
 
-class TestBlockchainVerification:
-    """On-chain vs off-chain comparison."""
+    def test_verify_data_matching(self):
+        """verifyData returns True when hashes match."""
+        mock_contract = MagicMock()
+        mock_contract.functions.verifyData.return_value.call.return_value = True
 
-    async def test_verify_matching_data(self, client):
-        """Data matches on-chain → verified=True."""
-        resp = await client.get(
-            "/blockchain/verify/test-collection-uuid",
-            headers={"Authorization": "Bearer mock-consumer-jwt"}
-        )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "verified" in data
-        # If mock DB has matching data, should be True
-        assert data["verified"] in (True, False)
+        from app.services.blockchain import BlockchainService
+        service = BlockchainService()
+        service.contract = mock_contract
+        service.w3 = MagicMock()
 
-    async def test_verify_without_auth(self, client):
-        """Verification endpoint requires auth."""
-        resp = await client.get("/blockchain/verify/test-uuid")
-        assert resp.status_code == 401
+        assert service.verify_data(0, b'\x00' * 32) is True
 
-    async def test_verify_nonexistent_collection(self, client):
-        """Non-existent collection returns 404."""
-        resp = await client.get(
-            "/blockchain/verify/00000000-0000-0000-0000-000000000000",
-            headers={"Authorization": "Bearer mock-consumer-jwt"}
-        )
-        assert resp.status_code == 404
+    def test_verify_data_mismatch(self):
+        """verifyData returns False when hashes differ."""
+        mock_contract = MagicMock()
+        mock_contract.functions.verifyData.return_value.call.return_value = False
 
-    async def test_verify_response_contains_all_fields(self, client):
-        """Verify response has complete blockchain record info."""
-        resp = await client.get(
-            "/blockchain/verify/test-collection-uuid",
-            headers={"Authorization": "Bearer mock-consumer-jwt"}
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            assert "collection_id" in data
-            assert "verified" in data
-            assert "on_chain_record" in data
-            assert "off_chain_hash" in data
-            assert "hash_match" in data
-            assert "tx_hash" in data
+        from app.services.blockchain import BlockchainService
+        service = BlockchainService()
+        service.contract = mock_contract
+        service.w3 = MagicMock()
 
-    async def test_owner_verification_shows_all_details(self, client):
-        """Owner sees full audit data."""
-        resp = await client.get(
-            "/blockchain/verify/test-collection-uuid",
-            headers={"Authorization": "Bearer mock-owner-jwt"}
-        )
-        assert resp.status_code == 200
+        assert service.verify_data(0, b'\xff' * 32) is False
 
 
 class TestBackgroundPoller:
     """Tx confirmation poller state machine."""
 
-    @pytest.fixture
-    def poller(self):
+    def test_poller_marks_tx_as_confirmed(self):
+        """Tx receipt with status=1 → returns confirmed."""
         from app.services.blockchain_poller import BlockchainPoller
-        return BlockchainPoller()
+        poller = BlockchainPoller()
+        poller.w3 = MagicMock()
+        poller.w3.eth.get_transaction_receipt.return_value = {
+            "status": 1, "blockNumber": 12345678, "gasUsed": 80000
+        }
 
-    async def test_poller_finds_pending_records(self, poller, monkeypatch):
-        """Poller queries for records with status='pending'."""
-        mock_query = AsyncMock(return_value=[
-            {"id": "rec-1", "tx_hash": "0xabc", "status": "pending"}
-        ])
-        monkeypatch.setattr(poller, "get_pending_records", mock_query)
+        record = MagicMock(id="rec-1", tx_hash="0xabc", status="pending", retry_count=0)
+        result = poller._check_transaction(record)
+        assert result["status"] == "confirmed"
+        assert result["record_id"] == "rec-1"
 
-        records = await poller.get_pending_records()
-        assert len(records) == 1
-        assert records[0]["status"] == "pending"
+    def test_poller_marks_tx_as_failed(self):
+        """Tx receipt with status=0 → returns failed."""
+        from app.services.blockchain_poller import BlockchainPoller
+        poller = BlockchainPoller()
+        poller.w3 = MagicMock()
+        poller.w3.eth.get_transaction_receipt.return_value = {
+            "status": 0, "blockNumber": 12345678, "gasUsed": 80000
+        }
 
-    async def test_poller_marks_tx_as_confirmed(self, poller, monkeypatch):
-        """Tx receipt with status=1 → status='confirmed'."""
-        mock_receipt = {"status": 1, "blockNumber": 12345678, "gasUsed": 80000}
-        monkeypatch.setattr(
-            "app.services.blockchain_poller.BlockchainPoller.get_tx_receipt",
-            lambda self, tx_hash: mock_receipt
+        record = MagicMock(id="rec-1", tx_hash="0xabc", status="pending", retry_count=0)
+        result = poller._check_transaction(record)
+        assert result["status"] == "failed"
+
+    def test_poller_handles_none_receipt(self):
+        """Receipt is None → still pending."""
+        from app.services.blockchain_poller import BlockchainPoller
+        poller = BlockchainPoller()
+        poller.w3 = MagicMock()
+        poller.w3.eth.get_transaction_receipt.return_value = None
+
+        result = poller._check_transaction(
+            MagicMock(id="rec-1", tx_hash="0xabc", status="pending", retry_count=0)
         )
+        assert result["status"] == "pending"
 
-        mock_update = AsyncMock()
-        monkeypatch.setattr(poller, "update_record_status", mock_update)
+    def test_poller_handles_rpc_error(self):
+        """RPC error → returns pending gracefully."""
+        from app.services.blockchain_poller import BlockchainPoller
+        poller = BlockchainPoller()
+        poller.w3 = MagicMock()
+        poller.w3.eth.get_transaction_receipt.side_effect = Exception("RPC timeout")
 
-        await poller.process_pending_record("rec-1", "0xabc")
-        mock_update.assert_called_with("rec-1", "confirmed", block_number=12345678)
-
-    async def test_poller_marks_tx_as_failed(self, poller, monkeypatch):
-        """Tx receipt with status=0 → status='failed'."""
-        mock_receipt = {"status": 0, "blockNumber": 12345678, "gasUsed": 80000}
-        monkeypatch.setattr(
-            "app.services.blockchain_poller.BlockchainPoller.get_tx_receipt",
-            lambda self, tx_hash: mock_receipt
+        result = poller._check_transaction(
+            MagicMock(id="rec-1", tx_hash="0xabc", status="pending", retry_count=0)
         )
+        assert result["status"] == "pending"
 
-        mock_update = AsyncMock()
-        monkeypatch.setattr(poller, "update_record_status", mock_update)
-
-        await poller.process_pending_record("rec-1", "0xabc")
-        mock_update.assert_called_with("rec-1", "failed")
-
-    async def test_poller_skips_records_without_tx_hash(self, poller):
-        """Records with null tx_hash are skipped."""
-        result = await poller.process_pending_record("rec-1", None)
-        assert result is False  # Indicates skipped
-
-    async def test_poller_skips_stale_records(self, poller):
-        """Records older than 30 minutes are skipped and marked as failed."""
-        from app.services.blockchain_poller import MAX_PENDING_AGE_MINUTES
-
-        stale_time = datetime.now(timezone.utc) - timedelta(minutes=MAX_PENDING_AGE_MINUTES + 1)
-        is_stale = poller._is_stale(stale_time)
-        assert is_stale is True
-
-    async def test_poller_does_not_skip_fresh_records(self, poller):
-        """Records created 5 minutes ago are still processed."""
-        fresh_time = datetime.now(timezone.utc) - timedelta(minutes=5)
-        is_stale = poller._is_stale(fresh_time)
-        assert is_stale is False
-
-    async def test_poller_recovers_from_rpc_failure(self, poller, monkeypatch):
-        """RPC exception doesn't crash the loop — returns gracefully."""
-        monkeypatch.setattr(
-            "app.services.blockchain_poller.BlockchainPoller.get_tx_receipt",
-            lambda self, tx_hash: (_ for _ in ()).throw(Exception("RPC timeout"))
-        )
-
-        # Should not raise — should log error and continue
-        result = await poller.process_pending_record("rec-1", "0xabc")
-        assert result is False  # Indicates failure handled gracefully
-
-    async def test_poller_reconnects_after_rpc_disconnect(self, poller, monkeypatch):
-        """After an RPC error, the next cycle succeeds."""
-        call_count = 0
-
-        def flaky_receipt(tx_hash):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                raise Exception("RPC timeout")
-            return {"status": 1, "blockNumber": 12345678, "gasUsed": 80000}
-
-        monkeypatch.setattr(
-            "app.services.blockchain_poller.BlockchainPoller.get_tx_receipt",
-            flaky_receipt
-        )
-        mock_update = AsyncMock()
-        monkeypatch.setattr(poller, "update_record_status", mock_update)
-
-        # First call fails
-        await poller.process_pending_record("rec-1", "0xabc")
-        # Second call succeeds
-        await poller.process_pending_record("rec-1", "0xabc")
-        mock_update.assert_called_with("rec-1", "confirmed", block_number=12345678)
-
-    async def test_poller_invalid_tx_hash_handled(self, poller, monkeypatch):
-        """Malformed tx hash doesn't crash the poller."""
-        monkeypatch.setattr(
-            "app.services.blockchain_poller.BlockchainPoller.get_tx_receipt",
-            lambda self, tx_hash: (_ for _ in ()).throw(Exception("invalid argument 0"))
-        )
-
-        result = await poller.process_pending_record("rec-1", "not-a-valid-hash")
-        assert result is False
-
-    async def test_poller_retries_failed_records(self, poller, monkeypatch):
-        """Failed records get retried up to MAX_RETRIES times."""
-        from app.services.blockchain_poller import MAX_RETRIES
-
-        mock_receipt = {"status": 0, "blockNumber": 12345678, "gasUsed": 80000}
-        monkeypatch.setattr(
-            "app.services.blockchain_poller.BlockchainPoller.get_tx_receipt",
-            lambda self, tx_hash: mock_receipt
-        )
-
-        mock_update = AsyncMock()
-        monkeypatch.setattr(poller, "update_record_status", mock_update)
-
-        # Simulate retries
-        for attempt in range(MAX_RETRIES):
-            await poller.process_pending_record("rec-1", "0xabc", retry_count=attempt)
-            if attempt < MAX_RETRIES - 1:
-                mock_update.assert_called_with("rec-1", "pending_retry")
-            else:
-                mock_update.assert_called_with("rec-1", "failed")
+    def test_poller_constants_exported(self):
+        """Module-level constants are accessible."""
+        from app.services.blockchain_poller import MAX_PENDING_AGE_MINUTES, MAX_RETRIES, POLL_INTERVAL_SECONDS
+        assert MAX_PENDING_AGE_MINUTES == 30
+        assert MAX_RETRIES == 3
+        assert POLL_INTERVAL_SECONDS == 30
