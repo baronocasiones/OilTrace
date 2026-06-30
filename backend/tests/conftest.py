@@ -61,6 +61,7 @@ if not USE_REAL_PG:
 def db_session(db_url: str) -> Generator[Session, None, None]:
     """Create a fresh database session for each test."""
     from app.database import Base, get_engine
+    import app.models
 
     engine = create_engine(db_url)
     Base.metadata.create_all(bind=engine)
