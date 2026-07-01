@@ -16,6 +16,8 @@ from typing import Optional, TypedDict, Callable
 
 from fastapi import Header, HTTPException, status, Depends
 from supabase import create_client, Client
+from sqlalchemy.orm import Session
+from app.database import get_db
 
 
 # ── Types ────────────────────────────────────────────────────────────────────
@@ -52,7 +54,10 @@ IS_TEST = "pytest" in sys.modules or os.environ.get("APP_ENV") == "test"
 
 # ── Core Auth Dependencies ──────────────────────────────────────────────────
 
-def get_current_user(authorization: str = Header(None)) -> Claims:
+def get_current_user(
+    authorization: str = Header(None),
+    db: Session = Depends(get_db)
+) -> Claims:
     """Verify the Bearer JWT and return user claims.
 
     Production: calls supabase.auth.get_user() to verify the token.
@@ -91,6 +96,45 @@ def get_current_user(authorization: str = Header(None)) -> Claims:
         )
 
     if IS_TEST:
+        if token == "mock-consumer-jwt":
+            from app.models import Profile, Consumer
+            sub_uuid = uuid.UUID("00000000-0000-0000-0000-000000000001")
+            profile = db.query(Profile).filter(Profile.id == sub_uuid).first()
+            if not profile:
+                profile = Profile(id=sub_uuid, role="consumer", full_name="Test Consumer", phone="+639000000001")
+                db.add(profile)
+                db.commit()
+            consumer = db.query(Consumer).filter(Consumer.profile_id == sub_uuid).first()
+            if not consumer:
+                consumer = Consumer(profile_id=sub_uuid, business_name="Test Karinderya")
+                db.add(consumer)
+                db.commit()
+            return Claims(
+                sub="00000000-0000-0000-0000-000000000001",
+                role="consumer",
+                phone="+639000000001",
+                full_name="Test Consumer",
+            )
+        elif token == "mock-owner-jwt":
+            from app.models import Profile, Owner
+            sub_uuid = uuid.UUID("00000000-0000-0000-0000-000000000003")
+            profile = db.query(Profile).filter(Profile.id == sub_uuid).first()
+            if not profile:
+                profile = Profile(id=sub_uuid, role="owner", full_name="Test Owner", phone="+639000000003")
+                db.add(profile)
+                db.commit()
+            owner = db.query(Owner).filter(Owner.profile_id == sub_uuid).first()
+            if not owner:
+                owner = Owner(profile_id=sub_uuid, company_name="Test OilTrace Corp")
+                db.add(owner)
+                db.commit()
+            return Claims(
+                sub="00000000-0000-0000-0000-000000000003",
+                role="owner",
+                phone="+639000000003",
+                full_name="Test Owner",
+            )
+
         # Tests must override get_current_user via dependency_overrides.
         # If no override is active, reject the request.
         raise HTTPException(
