@@ -1,17 +1,27 @@
 # 14 — Risk Register & Open Questions
 
-## Risk Register
+## Active Risk Register
 
 | # | Risk | Probability | Impact | Mitigation |
 |---|------|------------|--------|------------|
-| 1 | **SIM800L 2G sunset** — Globe/Smart shutting down 2G towers in Metro Manila | Medium (1-2yr) | High — IoT devices lose connectivity | Design firmware with fallback: WiFi (ESP32 native) + upgrade path to SIM7000 LTE module |
-| 2 | **TPM sensor accuracy** — DFRobot SEN0515 spec says ±0.8°C at 25°C, higher error at cooking oil temps (180°C+) | Medium | Medium — misclassified oil grades | Simulate TPM values for MVP; calibrate with real lab-tested samples before production. Use TPM only as a proxy — add visual inspection step. |
-| 3 | **Blockchain gas costs** — Ethereum Sepolia is free, but mainnet would cost $3-10 per collection | Low (Phase 3) | High — unsustainable unit economics | Design for chain-agnostic from day 1. Polygon mainnet: $0.01-0.05 per tx. Batch collections into single tx. |
-| 4 | **Consumer adoption** — Karinderya owners don't download app | Medium | High — empty pipeline | Onboarding via SMS (no app needed to schedule pickup). Partner with sari-sari stores for signup. Use QR codes. |
-| 5 | **Driver churn** — Drivers leave, IoT hardware lost | Medium | Medium | Driver deposits hardware cost (₱500). Incentive: drivers are small vehicle owners (tricycle) — flexible gig model. |
-| 6 | **Government delays** — DENR permits take 6+ months | Medium | Medium — pilot stuck | Start DENR application early (Phase 2). In parallel, pilot with LGU only — many LGUs don't enforce DENR yet. |
-| 7 | **Regulatory change** — BSP classifies points as stored value | Low | High — complex compliance | Design points as partner-funded discounts (not OilTrace liability). Points never sold for cash. |
-| 8 | **Bank/GCash block** — Gas stations or GCash block crypto-related transactions | Low | Medium | Off-ramp via fiat only. Smart contract is on testnet only for MVP. No crypto payments in MVP. |
+| 1 | **SIM800L 2G sunset** — Globe/Smart shutting down 2G towers in Metro Manila | Medium (1-2yr) | High — IoT devices lose connectivity | **MVP:** Use ESP32 built-in WiFi + phone hotspot for demo (SIM800L is optional). **Production:** SIM800L for unattended operation; WiFi fallback adds complexity — skip for now. |
+| 2 | **TPM sensor accuracy at grade boundaries** — Sensor must sort oil into Premium (<20%), Standard (20-30%), Low (>30%) TPM. Error near boundary thresholds could misclassify oil, affecting revenue accuracy and buyer trust. Oil is collected at room temp (not 180°C+), so thermal accuracy is not a concern. | Medium | Medium — misclassified oil grades | Simulate TPM for MVP. In production: calibrate sensor against lab-tested reference oil samples; use conservative buffering at grade boundaries (e.g., flag 18-22% TPM as "manual review"); add visual inspection (color/appearance) as secondary check. |
+| 3 | **Consumer adoption** — Karinderya owners don't download app | Medium | High — empty pipeline | Onboarding via SMS (no app needed to schedule pickup). Partner with sari-sari stores for signup. Use QR codes. |
+| 4 | **Driver churn** — Drivers leave, IoT hardware lost | Medium | Medium | Driver deposits hardware cost (₱500). Incentive: drivers are small vehicle owners (tricycle) — flexible gig model. |
+
+## Deferred Risks (Post-MVP / Phase 2+)
+
+| # | Risk | Deferred To | Original Mitigation |
+|---|------|-------------|-------------------|
+| D1 | **Blockchain gas costs** — Ethereum Sepolia is free, but mainnet would cost $3-10 per collection | Phase 3 | Design chain-agnostic from day 1. Polygon mainnet: $0.01-0.05 per tx. Batch collections into single tx. |
+| D2 | **Government delays** — DENR permits take 6+ months | Phase 2 | Start DENR application early. Pilot with LGU only in parallel (many LGUs don't enforce DENR yet). |
+| D3 | **Regulatory change** — BSP classifies points as stored value | Phase 2 | Design points as partner-funded discounts (not OilTrace liability). Points never sold for cash. |
+
+## Removed Risks
+
+| # | Risk | Reason |
+|---|------|--------|
+| — | **Bank/GCash block** — Gas stations or GCash block crypto-related transactions | Removed. No real crypto payments in MVP; off-ramp is fiat only. Not relevant to current business model. |
 
 ## Resolved Decisions (Locked In)
 
