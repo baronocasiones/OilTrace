@@ -75,6 +75,11 @@ def db_session(db_url: str) -> Generator[Session, None, None]:
     so every test starts with a clean state.
     """
     from app.database import Base
+    
+    # 🔥 FIX: Explicitly import your models module here.
+    # This forces SQLAlchemy to discover and register all tables (including 'profiles')
+    # before metadata.create_all runs on the very first test loop.
+    import app.models
 
     engine = create_engine(db_url)
     Base.metadata.create_all(bind=engine)
@@ -85,7 +90,6 @@ def db_session(db_url: str) -> Generator[Session, None, None]:
 
     session.close()
     Base.metadata.drop_all(bind=engine)
-
 
 @pytest_asyncio.fixture
 async def client(db_session: Session) -> AsyncGenerator[AsyncClient, None]:
