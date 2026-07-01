@@ -11,6 +11,13 @@ from app.database import get_db
 from app.dependencies import require_role, parse_claims_sub, Claims
 from app.models import Partner, Voucher, PointsLedger, Consumer
 from app.services.points import redeem_points, InsufficientPointsError
+from app.services.partners import (
+    get_partner,
+    create_partner as create_partner_srv,
+    update_partner as update_partner_srv,
+    list_partners,
+    list_vouchers as list_vouchers_srv
+)
 
 router = APIRouter()
 
@@ -128,7 +135,8 @@ async def create_partner(
     claims: Claims = Depends(require_role("owner")),
     db: Session = Depends(get_db)
 ):
-    partner = Partner(
+    return await create_partner_srv(
+        db=db,
         name=payload.name,
         brand=payload.brand,
         logo_url=payload.logo_url,
@@ -139,10 +147,6 @@ async def create_partner(
         max_redemption=payload.max_redemption,
         settlement_terms=payload.settlement_terms or "Monthly, net 15"
     )
-    db.add(partner)
-    db.commit()
-    db.refresh(partner)
-    return partner
 
 
 @router.get("/owners/partners", response_model=List[PartnerResponse])
@@ -150,7 +154,7 @@ async def list_partners_owner(
     claims: Claims = Depends(require_role("owner")),
     db: Session = Depends(get_db)
 ):
-    return db.query(Partner).all()
+    return await list_partners(db, active_only=False)
 
 
 @router.put("/owners/partners/{partner_id}", response_model=PartnerResponse)
@@ -161,16 +165,11 @@ async def update_partner(
     db: Session = Depends(get_db)
 ):
     partner_uuid = parse_uuid(partner_id)
-    partner = db.query(Partner).filter(Partner.id == partner_uuid).first()
+    partner = await get_partner(db, partner_uuid)
     if not partner:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Partner not found")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(partner, field, value)
-
-    db.commit()
-    db.refresh(partner)
-    return partner
+    return await update_partner_srv(db, partner, payload.model_dump(exclude_unset=True))
 
 
 # 2. Partner Listing (Consumer)
@@ -180,7 +179,7 @@ async def list_partners_consumer(
     claims: Claims = Depends(require_role("consumer")),
     db: Session = Depends(get_db)
 ):
-    return db.query(Partner).filter(Partner.is_active == True).all()
+    return await list_partners(db, active_only=True)
 
 
 # 3. Voucher Redemption & Listings (Consumer)
@@ -197,7 +196,7 @@ async def redeem_points_route(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Consumer profile not found")
 
     partner_uuid = parse_uuid(payload.partner_id)
-    partner = db.query(Partner).filter(Partner.id == partner_uuid).first()
+    partner = await get_partner(db, partner_uuid)
     if not partner:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Partner not found")
 
@@ -277,7 +276,7 @@ async def list_vouchers(
     consumer = db.query(Consumer).filter(Consumer.profile_id == profile_uuid).first()
     if not consumer:
         return []
-    return db.query(Voucher).filter(Voucher.consumer_id == consumer.id).all()
+    return await list_vouchers_srv(db, consumer.id)
 
 
 # 4. Points Balance & Ledger History (Consumer)
