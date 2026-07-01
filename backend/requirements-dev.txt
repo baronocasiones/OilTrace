@@ -7,3 +7,5 @@ pytest-asyncio
 httpx
 anyio
 web3
+supabase
+slowapi

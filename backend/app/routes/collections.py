@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import require_role, parse_claims_sub
 from app.models import Profile, Consumer, Driver, Owner, CollectionRequest, Collection
 
 router = APIRouter()
@@ -116,14 +116,9 @@ def get_or_create_driver(db: Session, ref_str: str) -> Optional[Driver]:
 # 1. Consumer Requests
 
 @router.post("/consumers/requests", response_model=RequestResponse, status_code=status.HTTP_201_CREATED)
-def create_request(payload: CreateRequest, current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role != "consumer":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "FORBIDDEN", "message": "Access denied", "status_code": 403}
-        )
-    
-    consumer = db.query(Consumer).filter(Consumer.profile_id == current_user.id).first()
+def create_request(payload: CreateRequest, claims: dict = Depends(require_role("consumer")), db: Session = Depends(get_db)):
+    profile_id = parse_claims_sub(claims)
+    consumer = db.query(Consumer).filter(Consumer.profile_id == profile_id).first()
     if not consumer:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -149,28 +144,18 @@ def create_request(payload: CreateRequest, current_user: Profile = Depends(get_c
     return req
 
 @router.get("/consumers/requests", response_model=List[RequestResponse])
-def list_requests(current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role != "consumer":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "FORBIDDEN", "message": "Access denied", "status_code": 403}
-        )
-        
-    consumer = db.query(Consumer).filter(Consumer.profile_id == current_user.id).first()
+def list_requests(claims: dict = Depends(require_role("consumer")), db: Session = Depends(get_db)):
+    profile_id = parse_claims_sub(claims)
+    consumer = db.query(Consumer).filter(Consumer.profile_id == profile_id).first()
     if not consumer:
         return []
         
     return db.query(CollectionRequest).filter(CollectionRequest.consumer_id == consumer.id).all()
 
 @router.get("/consumers/requests/{id}", response_model=RequestResponse)
-def get_request(id: str, current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role != "consumer":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "FORBIDDEN", "message": "Access denied", "status_code": 403}
-        )
-        
-    consumer = db.query(Consumer).filter(Consumer.profile_id == current_user.id).first()
+def get_request(id: str, claims: dict = Depends(require_role("consumer")), db: Session = Depends(get_db)):
+    profile_id = parse_claims_sub(claims)
+    consumer = db.query(Consumer).filter(Consumer.profile_id == profile_id).first()
     if not consumer:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -189,28 +174,18 @@ def get_request(id: str, current_user: Profile = Depends(get_current_user), db: 
 # 2. Consumer History
 
 @router.get("/consumers/history", response_model=List[CollectionResponse])
-def list_consumer_history(current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role != "consumer":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "FORBIDDEN", "message": "Access denied", "status_code": 403}
-        )
-        
-    consumer = db.query(Consumer).filter(Consumer.profile_id == current_user.id).first()
+def list_consumer_history(claims: dict = Depends(require_role("consumer")), db: Session = Depends(get_db)):
+    profile_id = parse_claims_sub(claims)
+    consumer = db.query(Consumer).filter(Consumer.profile_id == profile_id).first()
     if not consumer:
         return []
         
     return db.query(Collection).filter(Collection.consumer_id == consumer.id).all()
 
 @router.get("/consumers/history/{id}", response_model=CollectionResponse)
-def get_consumer_history_item(id: str, current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role != "consumer":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "FORBIDDEN", "message": "Access denied", "status_code": 403}
-        )
-        
-    consumer = db.query(Consumer).filter(Consumer.profile_id == current_user.id).first()
+def get_consumer_history_item(id: str, claims: dict = Depends(require_role("consumer")), db: Session = Depends(get_db)):
+    profile_id = parse_claims_sub(claims)
+    consumer = db.query(Consumer).filter(Consumer.profile_id == profile_id).first()
     if not consumer:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -229,13 +204,8 @@ def get_consumer_history_item(id: str, current_user: Profile = Depends(get_curre
 # 3. Owner Actions
 
 @router.put("/owners/requests/{id}/assign", response_model=RequestResponse)
-def assign_driver(id: str, payload: AssignDriverRequest, current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role != "owner":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "FORBIDDEN", "message": "Access denied", "status_code": 403}
-        )
-        
+def assign_driver(id: str, payload: AssignDriverRequest, claims: dict = Depends(require_role("owner")), db: Session = Depends(get_db)):
+    
     req_uuid = parse_uuid(id)
     req = db.query(CollectionRequest).filter(CollectionRequest.id == req_uuid).first()
     if not req:
@@ -259,24 +229,14 @@ def assign_driver(id: str, payload: AssignDriverRequest, current_user: Profile =
     return req
 
 @router.get("/owners/collections", response_model=List[CollectionResponse])
-def list_all_collections(current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role != "owner":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "FORBIDDEN", "message": "Access denied", "status_code": 403}
-        )
+def list_all_collections(claims: dict = Depends(require_role("owner")), db: Session = Depends(get_db)):
     return db.query(Collection).all()
 
 # 4. Driver Actions
 
 @router.put("/drivers/requests/{id}/status", response_model=RequestResponse)
-def update_request_status(id: str, payload: StatusUpdateRequest, current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role != "driver":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "FORBIDDEN", "message": "Access denied", "status_code": 403}
-        )
-        
+def update_request_status(id: str, payload: StatusUpdateRequest, claims: dict = Depends(require_role("driver")), db: Session = Depends(get_db)):
+    
     req_uuid = parse_uuid(id)
     req = db.query(CollectionRequest).filter(CollectionRequest.id == req_uuid).first()
     if not req:
@@ -307,14 +267,9 @@ def update_request_status(id: str, payload: StatusUpdateRequest, current_user: P
     return req
 
 @router.post("/drivers/collect")
-def driver_collect(payload: DriverCollectRequest, current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role != "driver":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "FORBIDDEN", "message": "Access denied", "status_code": 403}
-        )
-        
-    driver = db.query(Driver).filter(Driver.profile_id == current_user.id).first()
+def driver_collect(payload: DriverCollectRequest, claims: dict = Depends(require_role("driver")), db: Session = Depends(get_db)):
+    profile_id = parse_claims_sub(claims)
+    driver = db.query(Driver).filter(Driver.profile_id == profile_id).first()
     
     # Resolve consumer
     consumer = get_or_create_consumer(db, payload.consumer_ref)
@@ -383,26 +338,17 @@ def driver_collect(payload: DriverCollectRequest, current_user: Profile = Depend
     }
 
 @router.get("/drivers/history", response_model=List[CollectionResponse])
-def list_driver_history(current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role != "driver":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "FORBIDDEN", "message": "Access denied", "status_code": 403}
-        )
-        
-    driver = db.query(Driver).filter(Driver.profile_id == current_user.id).first()
+def list_driver_history(claims: dict = Depends(require_role("driver")), db: Session = Depends(get_db)):
+    profile_id = parse_claims_sub(claims)
+    driver = db.query(Driver).filter(Driver.profile_id == profile_id).first()
     if not driver:
         return []
         
     return db.query(Collection).filter(Collection.driver_id == driver.id).all()
 
 @router.get("/drivers/route")
-def get_driver_route(pending_only: bool = Query(True), current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role != "driver":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "FORBIDDEN", "message": "Access denied", "status_code": 403}
-        )
+def get_driver_route(pending_only: bool = Query(True), claims: dict = Depends(require_role("driver")), db: Session = Depends(get_db)):
+    
     # Simple mock response to satisfy the routing check in collection tests without route engine logic
     return {
         "route": [],
