@@ -50,38 +50,81 @@ OilTrace uses a defense-in-depth approach with five security layers.
 
 ### L2: FastAPI JWT Middleware
 
+Uses a hybrid approach — roles are stored in both Supabase Auth `user_metadata`
+and the local `profiles` table. The JWT is verified via the Supabase SDK for
+speed; the DB mirror enables RLS policies and reporting.
+
+**Dependency chain:**
+```
+Request → Header(Authorization) → get_current_user() → Claims(dict)
+                                                         │
+                                              require_role("consumer")
+                                              require_role("driver")
+                                              require_role("owner")
+```
+
 ```python
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import Optional, TypedDict
+from fastapi import Header, HTTPException, status, Depends
 from supabase import create_client
 
-security = HTTPBearer()
+class Claims(TypedDict):
+    sub: str          # auth.users UUID
+    role: str         # consumer | driver | owner
+    phone: Optional[str]
+    full_name: Optional[str]
 
-async def verify_jwt(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
-) -> dict:
-    """Verify Supabase JWT and return user claims."""
-    try:
-        user = supabase.auth.get_user(credentials.credentials)
-        return user.user.dict()
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token"
-        )
+def get_current_user(authorization: str = Header(None)) -> Claims:
+    """Verify Bearer JWT and return claims.
 
-async def require_role(required_role: str):
-    """Dependency factory for role-based access."""
-    async def role_checker(user: dict = Depends(verify_jwt)) -> dict:
-        user_role = user.get("user_metadata", {}).get("role")
-        if user_role != required_role:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Requires {required_role} role"
-            )
-        return user
+    Production: calls supabase.auth.get_user() to verify the token.
+    Test:       raises 401 — tests override via dependency_overrides.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, ...)
+
+    token = authorization.split(" ", 1)[1]
+
+    # Test mode — no real Supabase calls
+    if "pytest" in sys.modules:
+        raise HTTPException(status_code=401, ...)
+
+    # Production — verify with Supabase
+    supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    user = supabase.auth.get_user(token)
+    metadata = user.user.user_metadata or {}
+    return Claims(
+        sub=user.user.id,
+        role=metadata.get("role", "consumer"),
+        phone=user.user.phone,
+        full_name=metadata.get("full_name"),
+    )
+
+def require_role(required_role: str):
+    """Dependency factory — enforces a specific role."""
+    def role_checker(claims: Claims = Depends(get_current_user)) -> Claims:
+        if claims["role"] != required_role:
+            raise HTTPException(status_code=403, ...)
+        return claims
     return role_checker
 ```
+
+**Usage on endpoints:**
+```python
+@router.post("/consumers/requests")
+def create_request(claims: Claims = Depends(require_role("consumer"))):
+    # Only consumers reach this point
+    ...
+
+@router.put("/owners/requests/{id}/assign")
+def assign_driver(claims: Claims = Depends(require_role("owner"))):
+    # Only owners reach this point
+    ...
+```
+
+**Test mode:** The `get_current_user` dependency is replaced via
+`app.dependency_overrides[get_current_user]` — test fixtures inject `Claims`
+directly without hitting Supabase. See `docs/test.md` for fixture details.
 
 ### L3: Row Level Security (RLS)
 

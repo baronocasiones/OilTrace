@@ -21,21 +21,23 @@
 
 ### Day 3-4: Auth + Database
 
-| Task | Owner | Details |
-|------|-------|---------|
-| Supabase Auth integration | Mobile | Phone OTP login flow, JWT handling, auto-refresh |
-| All PostgreSQL tables | Backend | Run full schema (profiles, consumers, drivers, requests, collections, blockchain_records, points, partners, vouchers, iot_devices) |
-| FastAPI models + CRUD | Backend | SQLAlchemy models, Pydantic schemas, basic CRUD for all entities |
-| RLS policies | Backend | Row Level Security on every table |
-| Basic mobile screens | Mobile | Login screen, role-based landing, profile screen |
+| Task | Owner | Details | Status |
+|------|-------|---------|--------|
+| Supabase Auth integration (backend) | Backend | JWT verification via Supabase SDK, `require_role()` dependency, hybrid role-in-JWT-and-DB | ✅ Done |
+| Supabase Auth integration | Mobile | Phone OTP login flow, JWT handling, auto-refresh | ⬜ Pending |
+| All PostgreSQL tables | Backend | Run full schema (profiles, consumers, drivers, requests, collections, blockchain_records, points, partners, vouchers, iot_devices) | ✅ Done |
+| FastAPI models + CRUD | Backend | SQLAlchemy models, Pydantic schemas, basic CRUD for all entities | ✅ Done |
+| RLS policies | Backend | Row Level Security on every table | ⬜ Pending |
+| Basic mobile screens | Mobile | Login screen, role-based landing, profile screen | ⬜ Pending |
 
 ### Day 5: Core API
 
-| Task | Owner | Details |
-|------|-------|---------|
-| Collection request API | Backend | Create, list, update, assign |
-| Consumer/driver/owner endpoints | Backend | Profile CRUD, dashboard data |
-| Mobile: Dashboard + navigation | Mobile | Consumer and Driver home screens |
+| Task | Owner | Details | Status |
+|------|-------|---------|--------|
+| Collection request API | Backend | Create, list, update, assign with role-gated access | ✅ Done |
+| Consumer/driver/owner endpoints | Backend | Profile CRUD, role-protected endpoints | ✅ Done |
+| Auth endpoints (register/login/profile) | Backend | Supabase admin create, sign in with password, JWT claim introspection | ✅ Done |
+| Mobile: Dashboard + navigation | Mobile | Consumer and Driver home screens | ⬜ Pending |
 
 ---
 
@@ -155,9 +157,13 @@ Mon │ Tue │ Wed │ Thu │ Fri │ Sat │ Sun
 ────┼─────┼─────┼─────┼─────┼─────┼─────
 SUP │ SUP │ AUTH│ AUTH│ API │ API │ REST
 FAS │ FAS │ DB  │ DB  │     │     │ or
-REN │ REN │ SCRN│ SCRN│     │     │ CATCH
+REN │ REN │     │     │     │     │ CATCH
 ACT │ ACT │     │     │     │     │ UP
 ```
+
+> **Progress:** Backend auth (Supabase JWT, `require_role`, auth endpoints) and
+> core API (collection CRUD, role-gated endpoints) are ✅ done. Mobile auth
+> screens (SCRN) and RLS policies are ⬜ still pending.
 
 ### Week 2
 

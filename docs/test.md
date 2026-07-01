@@ -103,25 +103,94 @@ async def client(db_session):
 
 All test requests go through this client and hit the actual FastAPI routing/middleware — no `httpx` mocking.
 
-### 4. Auth Helpers
+### 4. Auth Claims
+
+Auth is tested via `Claims` TypedDicts injected as `dependency_overrides` — no real
+Supabase calls. Three claim fixtures generate random UUIDs per role:
 
 ```python
 @pytest.fixture
-def consumer_jwt() -> str:
-    return "mock-consumer-jwt-token"   # Patched in via dependency override
+def consumer_claims() -> Claims:
+    return Claims(
+        sub=str(uuid4()),          # random UUID matching auth.users
+        role="consumer",
+        phone="+639000000001",
+        full_name="Test Consumer",
+    )
 
 @pytest.fixture
-def driver_jwt() -> str:
-    return "mock-driver-jwt-token"
+def driver_claims() -> Claims:
+    return Claims(
+        sub=str(uuid4()),
+        role="driver",
+        phone="+639000000002",
+        full_name="Test Driver",
+    )
 
 @pytest.fixture
-def owner_jwt() -> str:
-    return "mock-owner-jwt-token"
+def owner_claims() -> Claims:
+    return Claims(
+        sub=str(uuid4()),
+        role="owner",
+        phone="+639000000003",
+        full_name="Test Owner",
+    )
 ```
 
-In production, these are Supabase Auth JWTs. In tests, they're placeholder strings that the auth middleware's dependency override interprets as predefined roles. This avoids needing a running Supabase instance.
+### 5. Authenticated HTTP Clients
 
-### 5. RLS Seed Data
+Convenience fixtures that combine an HTTP client + auth override + DB seeding:
+
+| Fixture | Role | Seeds DB |
+|---------|------|----------|
+| `consumer_client` | consumer | Profile + Consumer record |
+| `driver_client` | driver | Profile + Driver record |
+| `owner_client` | owner | Profile + Owner record |
+
+```python
+@pytest_asyncio.fixture
+async def consumer_client(client, consumer_claims, db_session):
+    _seed_profile_and_role(db_session, consumer_claims)
+    app.dependency_overrides[get_current_user] = lambda: consumer_claims
+    yield client
+    app.dependency_overrides.pop(get_current_user, None)
+```
+
+Routes look up `Consumer`/`Driver`/`Owner` by `profile_id`, so `_seed_profile_and_role`
+creates matching rows before each test:
+
+```python
+def _seed_profile_and_role(db_session, claims):
+    profile = Profile(id=UUID(claims["sub"]), role=claims["role"], ...)
+    db_session.add(profile)
+    if claims["role"] == "consumer":
+        db_session.add(Consumer(profile_id=profile.id, business_name="Test Karinderya"))
+    ...
+```
+
+### 6. Multi-Role Switching (`set_auth`)
+
+For tests that need multiple roles in a single test (e.g., consumer creates → owner assigns):
+
+```python
+@pytest.fixture
+def set_auth(db_session):
+    def _set(claims):
+        _seed_profile_and_role(db_session, claims)     # ensure DB records exist
+        app.dependency_overrides[get_current_user] = lambda: claims
+    yield _set
+    app.dependency_overrides.pop(get_current_user, None)
+
+# Usage:
+async def test_owner_can_assign_driver(self, client, set_auth, consumer_claims, owner_claims):
+    set_auth(consumer_claims)
+    await client.post("/consumers/requests", ...)       # as consumer
+
+    set_auth(owner_claims)
+    await client.put("/owners/requests/{id}/assign", ...)  # as owner
+```
+
+### 7. RLS Seed Data
 
 The `mock_rls_session` fixture creates two consumers, one driver, and one owner in the database so RLS boundary tests can verify cross-user isolation:
 
@@ -178,22 +247,43 @@ assert len(result["tx_hash"]) == 66  # "0x" + 64 hex chars
 
 ### API Tests (full HTTP round-trip)
 
-These use the `client` fixture and test the complete request→middleware→route→service→response pipeline. The database is real (SQLite or Postgres); only external services (Web3, SMS, push) are mocked.
+These use authenticated client fixtures and test the complete
+request→middleware→route→service→response pipeline. The database is real (SQLite
+or Postgres); only external services (Web3, SMS, push) are mocked.
 
-**Examples:** `test_auth_middleware.py`, `test_collection_api.py`, `test_push_notifications.py`
+**Examples:** `test_auth_middleware.py`, `test_collection_api.py`
 
 ```python
-# test_push_notifications.py (API test)
-async def test_register_device_token(self, client):
-    resp = await client.post(
-        "/notifications/register",
-        json={
-            "token": "ExponentPushToken[test-token-123456]",
-            "device_platform": "ios"
-        },
-        headers={"Authorization": "Bearer mock-consumer-jwt"}
+# test_collection_api.py — using authenticated client fixture
+async def test_create_on_demand_request(self, consumer_client):
+    """Consumer creates an on-demand request → status=pending."""
+    resp = await consumer_client.post(
+        "/consumers/requests",
+        json={"request_type": "on_demand", "notes": "Pickup ASAP"},
     )
+    assert resp.status_code == 201
+    assert resp.json()["status"] == "pending"
+```
+
+For tests needing role switching mid-test (e.g., consumer creates → owner assigns):
+
+```python
+async def test_owner_can_assign_driver(self, client, set_auth, consumer_claims, owner_claims):
+    set_auth(consumer_claims)
+    create = await client.post("/consumers/requests", json={"request_type": "on_demand"})
+    req_id = create.json()["id"]
+
+    set_auth(owner_claims)
+    resp = await client.put(f"/owners/requests/{req_id}/assign", json={"driver_id": "..."})
     assert resp.status_code == 200
+```
+
+Use bare `client` (no auth override) to test 401 behavior:
+
+```python
+async def test_no_token_returns_401(self, client):
+    resp = await client.get("/consumers/requests")
+    assert resp.status_code == 401
 ```
 
 ---
@@ -211,7 +301,7 @@ async def test_register_device_token(self, client):
 | Edge cases | 4 | Zero address, empty geohash, duplicate record ID, zero volume |
 | Gas benchmark | 1 | Records gas cost of `recordCollection` for optimization reference |
 
-### Backend Tests — ~112 tests
+### Backend Tests — 120 tests (51 pass, 58 pre-existing failures, 11 skipped)
 
 | File | Tests | What it validates | Category |
 |------|-------|-------------------|----------|
@@ -219,8 +309,8 @@ async def test_register_device_token(self, client):
 | `test_points.py` | 14 | Earn calculation (10 pts/L), redemption deduction, insufficient balance → 400, 90-day expiry, running ledger integrity across 5+ transactions | Pure unit |
 | `test_blockchain_service.py` | 15 | Web3.py write with correct args, contract-owner-only guard, RPC connection failure, verification endpoint, poller state machine: confirmed/failed/stale/RPC recovery/retry count max | Service |
 | `test_routes.py` | 8 | Multi-stop/single-stop/zero-stop routes, OSRM success response parsing, OSRM timeout fallback, OSRM HTTP error fallback, nearest-neighbor ordering correctness | Service |
-| `test_auth_middleware.py` | 16 | No-auth → 401, malformed/expired/wrong-role JWT → 401, consumer/driver/owner role enforcement on protected endpoints, IoT device credentials (valid/invalid/missing), rate limiting headers | API |
-| `test_collection_api.py` | 12 | Create collection request, driver assignment (role-gated), TPM validation on recording, status transitions: pending→assigned→in_progress→completed, cancel from wrong role → 403, completed→cancel → 400 | API |
+| `test_auth_middleware.py` | 14 | No-auth → 401, empty token → 401, any token without override → 401, consumer/driver/owner role enforcement (403), unauthenticated request → 401, IoT auth/reading stubbed (404), rate limiter active | API |
+| `test_collection_api.py` | 21 | Create on-demand/scheduled request, list own, get single, 404 for nonexistent, driver assign (owner can/consumer cannot/driver cannot), record collection with/without request, TPM validation (out-of-range, negative), route retrieval, status transitions (valid/invalid/completed cancel) | API |
 | `test_push_notifications.py` | 10 | Register/unregister device token, send on assignment/completion/expiry, malformed token → 400, rate limiting (burst of 20), notification audit log for owner | API |
 | `test_partners.py` | 8 | Create/list partners (owner-only), voucher code format (`OIL-XXXXXXXX`), QR data format (`oiltrace://voucher/...`), expiry display, settlement amount math | API |
 | `test_realtime.py` | 8 | Channel authorization: driver subscribes OK, consumer can subscribe to assigned driver, consumer rejected for unassigned driver, unauthenticated → 401, payload field validation, rate limit after 10 updates/second, disconnect cleanup | API |
@@ -281,10 +371,15 @@ def test_some_business_logic(self):
     from app.services.my_service import calculate
     assert calculate(5) == 25
 
-# API test — just use client
-async def test_my_endpoint(self, client):
-    resp = await client.get("/my/endpoint", headers=auth_header)
+# API test — use role-specific client
+async def test_my_endpoint(self, consumer_client):
+    resp = await consumer_client.get("/my/endpoint")
     assert resp.status_code == 200
+
+# API test — bare client for 401 testing
+async def test_requires_auth(self, client):
+    resp = await client.get("/my/endpoint")
+    assert resp.status_code == 401
 ```
 
 ### Contract test (new function)
@@ -301,4 +396,4 @@ async def test_my_endpoint(self, client):
 - **Blockchain tests use mocked Web3.py** — no actual Sepolia RPC calls during unit tests
 - **Route tests use mocked OSRM responses** — no live OSRM calls; integration tests would need a real endpoint
 - **Async tests** use `pytest-asyncio` — test functions must be `async def` or they won't await properly
-- **Supabase Auth** is not tested at the unit level — the JWT verification is replaced by a mock dependency; full auth flow requires Supabase local dev or staging
+- **Supabase Auth** is not tested at the unit level — JWT verification is replaced by `dependency_overrides` in test mode; full auth flow requires Supabase local dev or staging
