@@ -40,7 +40,7 @@ Each row is updated when the corresponding feature spec (`FEATURES.md`) section 
 |---|---------|--------|------|-------|
 | F-001 | Project Bootstrap (Expo + Navigation + Design System) | ✅ | [F-001](feature-plan/FEATURES.md#F-001) | — |
 | F-002 | Auth — Login / Register (Consumer & Driver roles) | 🔲 | [F-002](feature-plan/FEATURES.md#F-002) | JWT from FastAPI backend |
-| F-003 | Consumer Dashboard — Home Screen | ✅ | [F-003](feature-plan/FEATURES.md#F-003) | Offline first cache |
+| F-003 | Consumer Dashboard — Home Screen | ✅ | [F-003](feature-plan/FEATURES.md#F-003) | Offline first cache, Custom Glassmorphic Tab Bar, Request Collection modal |
 | F-004 | Collection History | 🔲 | [F-004](feature-plan/FEATURES.md#F-004) | — |
 | F-005 | Points & Rewards | 🔲 | [F-005](feature-plan/FEATURES.md#F-005) | Partner store redemption |
 | F-006 | Driver Dashboard — Job Queue | 🔲 | — | — |
