@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, date
-from sqlalchemy import Column, String, Float, DateTime, Boolean, ForeignKey, Date, CheckConstraint, Uuid
+from sqlalchemy import Column, String, Float, DateTime, Boolean, ForeignKey, Date, CheckConstraint, Uuid, Integer
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -41,6 +41,8 @@ class Consumer(Base):
     profile = relationship("Profile", back_populates="consumer")
     requests = relationship("CollectionRequest", back_populates="consumer", cascade="all, delete-orphan")
     collections = relationship("Collection", back_populates="consumer", cascade="all, delete-orphan")
+    vouchers = relationship("Voucher", back_populates="consumer", cascade="all, delete-orphan")
+    ledger_entries = relationship("PointsLedger", back_populates="consumer", cascade="all, delete-orphan")
 
 
 class Driver(Base):
@@ -123,3 +125,65 @@ class Collection(Base):
     request = relationship("CollectionRequest", back_populates="collections")
     consumer = relationship("Consumer", back_populates="collections")
     driver = relationship("Driver", back_populates="collections")
+
+
+class Partner(Base):
+    __tablename__ = "partners"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False)
+    brand = Column(String, nullable=True)
+    logo_url = Column(String, nullable=True)
+    description = Column(String, nullable=True)
+    discount_per_point = Column(Float, nullable=False, default=0.50)
+    points_per_liter = Column(Integer, default=10)
+    min_redemption = Column(Integer, default=10)
+    max_redemption = Column(Integer, nullable=True)
+    is_active = Column(Boolean, default=True)
+    settlement_terms = Column(String, default="Monthly, net 15")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    vouchers = relationship("Voucher", back_populates="partner", cascade="all, delete-orphan")
+
+
+class Voucher(Base):
+    __tablename__ = "vouchers"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    consumer_id = Column(Uuid(as_uuid=True), ForeignKey("consumers.id", ondelete="CASCADE"), nullable=False)
+    partner_id = Column(Uuid(as_uuid=True), ForeignKey("partners.id", ondelete="CASCADE"), nullable=False)
+    points_used = Column(Integer, nullable=False)
+    discount_amount = Column(Float, nullable=False)
+    voucher_code = Column(String, unique=True, nullable=False)
+    qr_data = Column(String, nullable=True)
+    status = Column(String(20), default="active", nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("status IN ('active', 'used', 'expired', 'cancelled')", name="check_voucher_status"),
+    )
+
+    consumer = relationship("Consumer", back_populates="vouchers")
+    partner = relationship("Partner", back_populates="vouchers")
+
+
+class PointsLedger(Base):
+    __tablename__ = "points_ledger"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    consumer_id = Column(Uuid(as_uuid=True), ForeignKey("consumers.id", ondelete="CASCADE"), nullable=False)
+    collection_id = Column(Uuid(as_uuid=True), ForeignKey("collections.id", ondelete="SET NULL"), nullable=True)
+    points = Column(Integer, nullable=False)
+    transaction_type = Column(String(20), nullable=False)
+    reference = Column(String, nullable=True)
+    balance_after = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("transaction_type IN ('earned', 'redeemed', 'expired', 'bonus')", name="check_points_transaction_type"),
+    )
+
+    consumer = relationship("Consumer", back_populates="ledger_entries")
+    collection = relationship("Collection")
