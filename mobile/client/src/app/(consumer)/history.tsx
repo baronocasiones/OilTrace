@@ -14,6 +14,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   View,
   StyleSheet,
+  Platform,
   TouchableOpacity,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
