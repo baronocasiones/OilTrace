@@ -57,17 +57,17 @@ export function Badge({ variant, children }: BadgeProps) {
     'blockchain-verified': {
       container: { backgroundColor: `${c.accent}14`, borderColor: `${c.accent}40` },
       text: { color: c.accent },
-      label: 'Verified',
+      label: children ? String(children) : 'Verified',
     },
     'blockchain-pending': {
       container: { backgroundColor: `${c.accentSecondary}1A`, borderColor: `${c.accentSecondary}40` },
       text: { color: c.accentSecondaryDark },
-      label: 'Pending',
+      label: children ? String(children) : 'Pending',
     },
     'blockchain-failed': {
       container: g.badgeDanger,
       text: g.badgeDangerText,
-      label: 'Failed',
+      label: children ? String(children) : 'Failed',
     },
   };
 

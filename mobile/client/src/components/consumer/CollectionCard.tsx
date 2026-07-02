@@ -18,8 +18,7 @@ import { useTheme } from '../../theme';
 import { createGlobalStyles } from '../../theme/globalStyles';
 import { GlassCard } from '../ui/GlassCard';
 import { Badge, type BadgeVariant } from '../ui/Badge';
-import { Button } from '../ui/Button';
-import { Heading, BodyText, Label } from '../ui/Typography';
+import { Heading, Label, Mono } from '../ui/Typography';
 import type { CollectionListItem } from '../../mocks/history';
 import { GRADE_INFO } from '../../mocks/history';
 
@@ -34,8 +33,13 @@ function formatDate(isoString: string): string {
   return d.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
-    year: 'numeric',
   });
+}
+
+// Deterministic mock hash generator since it's not in the list API yet
+function getMockHash(id: string): string {
+  const num = parseInt(id.replace(/\D/g, ''), 10) || 123;
+  return `0x${(num * 314159).toString(16).padEnd(6, 'a')}...`;
 }
 
 const blockChainBadgeVariant: Record<string, BadgeVariant> = {
@@ -44,62 +48,83 @@ const blockChainBadgeVariant: Record<string, BadgeVariant> = {
   failed: 'blockchain-failed',
 };
 
-export function CollectionCard({ collection, onPress, onViewOnEtherscan }: CollectionCardProps) {
+const blockChainBadgeLabel: Record<string, string> = {
+  verified: 'Verified',
+  pending: 'Pending',
+  failed: 'Failed',
+};
+
+export function CollectionCard({ collection, onPress }: CollectionCardProps) {
   const { theme } = useTheme();
   const g = createGlobalStyles(theme);
   const c = theme.colors;
 
   const gradeInfo = GRADE_INFO[collection.oil_grade];
   const bcBadge = blockChainBadgeVariant[collection.blockchain_status];
+  const bcLabel = blockChainBadgeLabel[collection.blockchain_status];
 
   return (
     <GlassCard interactive onPress={onPress} style={styles.card}>
-      <View style={g.rowBetween}>
-        <View style={styles.leftContent}>
-          {/* Date */}
-          <Label size="sm" style={styles.dateLabel}>
-            {formatDate(collection.collected_at)}
+      {/* Top Row: Date & Grade */}
+      <View style={[g.rowBetween, styles.topRow]}>
+        <Label size="sm" style={[styles.boldLabel, { color: c.muted }]}>
+          {formatDate(collection.collected_at)}
+        </Label>
+        <Badge variant={gradeInfo.badgeVariant}>
+          {gradeInfo.label}
+        </Badge>
+      </View>
+
+      {/* Middle Row: Volume & TPM Grid */}
+      <View style={styles.middleRow}>
+        <View style={styles.columnLeft}>
+          <Label size="xs" muted style={styles.columnLabel}>
+            COLLECTED VOLUME
           </Label>
-
-          {/* Volume + TPM */}
-          <Heading size="sm" style={styles.volume}>
-            {collection.volume_liters}L
-          </Heading>
-          <BodyText size="sm" muted>
-            {collection.tpm_value.toFixed(1)}% TPM
-          </BodyText>
-
-          {/* Badges row */}
-          <View style={[g.row, styles.badgesRow]}>
-            <Badge variant={gradeInfo.badgeVariant}>
-              {gradeInfo.label}
-            </Badge>
-            <Badge variant={bcBadge} />
+          <View style={g.row}>
+            <Heading size="md" style={{ color: c.primary, marginTop: 2 }}>
+              {collection.volume_liters}
+            </Heading>
+            <BodyText size="sm" style={{ color: c.primary, marginLeft: 4, marginBottom: 2, alignSelf: 'flex-end', fontWeight: '600' }}>
+              Liters
+            </BodyText>
           </View>
         </View>
 
-        {/* Points + Etherscan */}
-        <View style={styles.rightContent}>
-          <BodyText size="sm" accent style={styles.pointsText}>
-            +{collection.points_awarded} pts
-          </BodyText>
-
-          {collection.blockchain_status === 'verified' && onViewOnEtherscan && (
-            <Button
-              variant="glass"
-              size="sm"
-              onPress={onViewOnEtherscan}
-              style={styles.etherscanBtn}
-            >
-              <MaterialCommunityIcons
-                name="open-in-new"
-                size={12}
-                color={c.foreground}
-              />
-              {' View'}
-            </Button>
-          )}
+        <View style={styles.columnRight}>
+          <Label size="xs" muted style={styles.columnLabel}>
+            TPM READING
+          </Label>
+          <View style={g.row}>
+            <Heading size="md" style={{ marginTop: 2 }}>
+              {collection.tpm_value.toFixed(1)}
+            </Heading>
+            <BodyText size="sm" style={{ marginLeft: 2, marginBottom: 2, alignSelf: 'flex-end', fontWeight: '600' }}>
+              %
+            </BodyText>
+          </View>
         </View>
+      </View>
+
+      {/* Divider */}
+      <View style={[styles.divider, { backgroundColor: c.border }]} />
+
+      {/* Bottom Row: Tx Hash & Verification */}
+      <View style={[g.rowBetween, styles.bottomRow]}>
+        <View style={g.row}>
+          <MaterialCommunityIcons
+            name="cube-outline"
+            size={14}
+            color={c.muted}
+            style={styles.txIcon}
+          />
+          <Mono size="sm" muted>
+            {collection.blockchain_status === 'failed' ? 'N/A' : getMockHash(collection.id)}
+          </Mono>
+        </View>
+        <Badge variant={bcBadge}>
+          {collection.blockchain_status === 'verified' ? `✓ ${bcLabel}` : bcLabel}
+        </Badge>
       </View>
     </GlassCard>
   );
@@ -111,31 +136,39 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 12,
   },
-  leftContent: {
+  topRow: {
+    marginBottom: 16,
+  },
+  boldLabel: {
+    fontWeight: '600',
+  },
+  middleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  columnLeft: {
     flex: 1,
-    marginRight: 12,
+    alignItems: 'flex-start',
   },
-  dateLabel: {
-    marginBottom: 4,
-  },
-  volume: {
-    marginBottom: 2,
-  },
-  badgesRow: {
-    marginTop: 8,
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  rightContent: {
-    justifyContent: 'center',
+  columnRight: {
+    flex: 1,
     alignItems: 'flex-end',
   },
-  pointsText: {
-    fontWeight: '700',
+  columnLabel: {
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
-  etherscanBtn: {
-    marginTop: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+  divider: {
+    height: 1,
+    width: '100%',
+    marginBottom: 12,
+    opacity: 0.5,
+  },
+  bottomRow: {
+    alignItems: 'center',
+  },
+  txIcon: {
+    marginRight: 6,
   },
 });

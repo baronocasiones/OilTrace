@@ -14,14 +14,10 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   View,
   StyleSheet,
-  Platform,
   TouchableOpacity,
-  ToastAndroid,
-  Alert,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../theme/ThemeContext';
 import { createGlobalStyles } from '../../theme/globalStyles';
@@ -118,34 +114,16 @@ export default function HistoryScreen() {
     [router],
   );
 
-  const handleViewOnEtherscan = useCallback(
-    async (collectionId: string) => {
-      const mockTxUrl = `https://sepolia.etherscan.io/tx/mock-${collectionId}`;
-      try {
-        await WebBrowser.openBrowserAsync(mockTxUrl, {
-          toolbarColor: '#0c0a0f',
-          controlsColor: '#33a190',
-        });
-      } catch {
-        if (Platform.OS === 'android') {
-          ToastAndroid.show('Could not open link. Check your internet connection.', ToastAndroid.SHORT);
-        } else {
-          Alert.alert('Connection Error', 'Could not open link. Check your internet connection.');
-        }
-      }
-    },
-    [],
-  );
+
 
   const renderItem = useCallback(
     ({ item }: { item: CollectionListItem }) => (
       <CollectionCard
         collection={item}
         onPress={() => handleCollectionPress(item.id)}
-        onViewOnEtherscan={() => handleViewOnEtherscan(item.id)}
       />
     ),
-    [handleCollectionPress, handleViewOnEtherscan],
+    [handleCollectionPress],
   );
 
   const keyExtractor = useCallback((item: CollectionListItem) => item.id, []);
