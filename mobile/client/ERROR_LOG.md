@@ -38,6 +38,44 @@ What should be done differently in the future to avoid this?
 
 <!-- Newest entries go at the top -->
 
+### ERR-004 — ReferenceError: BodyText is not defined
+
+**Date**: 2026-07-02  
+**Feature**: F-004  
+**Severity**: High  
+**Environment**: All
+
+#### Error
+`[ReferenceError: BodyText is not defined]` leading to a server error and app crash during rendering of `CollectionCard`.
+
+#### Root Cause
+During the UI polish phase where `BodyText` was reintroduced to separate the scalar metric from the unit label, it was not added back to the `Typography` import block at the top of the file.
+
+#### Fix
+Added `BodyText` to the `Typography` imports in `src/components/consumer/CollectionCard.tsx`.
+
+#### Prevention
+When adding new JSX elements (or re-adding removed ones), always ensure your editor auto-imports it or manually verify the import statement before testing the build.
+
+### ERR-003 — ReferenceError: Platform is not defined
+
+**Date**: 2026-07-02  
+**Feature**: F-004  
+**Severity**: High  
+**Environment**: All
+
+#### Error
+`Metro error: Platform is not defined` leading to a server error and app crash during rendering.
+
+#### Root Cause
+During dead-code removal (removing unused `WebBrowser` functions), `Platform` was accidentally removed from the `react-native` import block. However, it was still being actively used further down the file for layout (`paddingTop: Platform.OS === 'ios' ? 50 : 12`).
+
+#### Fix
+Restored `Platform` to the `react-native` import block in `src/app/(consumer)/history.tsx`.
+
+#### Prevention
+Before deleting seemingly unused imports from React Native, always perform a text search within the file to confirm the module is truly 100% unused.
+
 ### ERR-002 — FlashList Missing estimatedItemSize
 
 **Date**: 2026-07-02  

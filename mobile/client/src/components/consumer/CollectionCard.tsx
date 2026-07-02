@@ -18,7 +18,7 @@ import { useTheme } from '../../theme';
 import { createGlobalStyles } from '../../theme/globalStyles';
 import { GlassCard } from '../ui/GlassCard';
 import { Badge, type BadgeVariant } from '../ui/Badge';
-import { Heading, Label, Mono } from '../ui/Typography';
+import { Heading, Label, Mono, BodyText } from '../ui/Typography';
 import type { CollectionListItem } from '../../mocks/history';
 import { GRADE_INFO } from '../../mocks/history';
 
@@ -78,21 +78,21 @@ export function CollectionCard({ collection, onPress }: CollectionCardProps) {
       {/* Middle Row: Volume & TPM Grid */}
       <View style={styles.middleRow}>
         <View style={styles.columnLeft}>
-          <Label size="xs" muted style={styles.columnLabel}>
+          <Label size="sm" style={[styles.columnLabel, { color: c.muted }]}>
             COLLECTED VOLUME
           </Label>
           <View style={g.row}>
-            <Heading size="md" style={{ color: c.primary, marginTop: 2 }}>
+            <Heading size="md" style={{ color: c.accent, marginTop: 2 }}>
               {collection.volume_liters}
             </Heading>
-            <BodyText size="sm" style={{ color: c.primary, marginLeft: 4, marginBottom: 2, alignSelf: 'flex-end', fontWeight: '600' }}>
+            <BodyText size="sm" style={{ color: c.accent, marginLeft: 4, marginBottom: 2, alignSelf: 'flex-end', fontWeight: '600' }}>
               Liters
             </BodyText>
           </View>
         </View>
 
         <View style={styles.columnRight}>
-          <Label size="xs" muted style={styles.columnLabel}>
+          <Label size="sm" style={[styles.columnLabel, { color: c.muted }]}>
             TPM READING
           </Label>
           <View style={g.row}>
@@ -118,7 +118,7 @@ export function CollectionCard({ collection, onPress }: CollectionCardProps) {
             color={c.muted}
             style={styles.txIcon}
           />
-          <Mono size="sm" muted>
+          <Mono style={{ color: c.muted, fontSize: 12 }}>
             {collection.blockchain_status === 'failed' ? 'N/A' : getMockHash(collection.id)}
           </Mono>
         </View>
