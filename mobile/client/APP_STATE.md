@@ -23,7 +23,7 @@
 | 2 — Consumer Dashboard | ✅ Done |
 | 3 — Driver Dashboard | 🔲 Not Started |
 | 4 — IoT / Sensor Feed | 🔲 Not Started |
-| 5 — Rewards & Points | 🔲 Not Started |
+| 5 — Rewards & Points | ✅ Done |
 | 6 — Blockchain Records | 🔲 Not Started |
 | 7 — Notifications | 🔲 Not Started |
 | 8 — Settings & Profile | 🔲 Not Started |
@@ -42,7 +42,7 @@ Each row is updated when the corresponding feature spec (`FEATURES.md`) section 
 | F-002 | Auth — Login / Register (Consumer & Driver roles) | 🔲 | [F-002](feature-plan/FEATURES.md#F-002) | JWT from FastAPI backend |
 | F-003 | Consumer Dashboard — Home Screen | ✅ | [F-003](feature-plan/FEATURES.md#F-003) | Offline first cache, Custom Glassmorphic Tab Bar, Request Collection modal |
 | F-004 | Collection History | ✅ | [F-004](feature-plan/FEATURES.md#F-004) | FlashList, CollectionCard, blockchain verify, Etherscan deep link |
-| F-005 | Points & Rewards | 🔲 | [F-005](feature-plan/FEATURES.md#F-005) | Partner store redemption |
+| F-005 | Points & Rewards | ✅ | [F-005](feature-plan/F-005-points-rewards.md) | Partner store redemption, QR codes, offline-first |
 | F-006 | Driver Dashboard — Job Queue | 🔲 | — | — |
 | F-007 | Driver — Active Pickup & IoT Sensor View | 🔲 | — | ESP32 data |
 | F-008 | Blockchain Record Viewer | 🔲 | — | Sepolia explorer link |

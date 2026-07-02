@@ -342,7 +342,7 @@ Allow consumers to review their past oil collections with quality grades, volume
 
 ## F-005 — Points & Rewards
 
-**Status**: Draft  
+**Status**: Done  
 **Phase**: 5 — Rewards & Points  
 **Dependencies**: F-001
 
@@ -474,15 +474,15 @@ Allow consumers to view their points balance and transaction history, browse par
 - **QR code generation failure** → Fallback to showing voucher code in large text as alternative.
 
 ### Acceptance Criteria
-- [ ] Points balance screen shows total points, peso value, and earned/used breakdown with mock data.
-- [ ] Partner stores section renders 3+ mock partners with exchange rates and Redeem buttons.
-- [ ] Redeem button is disabled when user has insufficient points, with helpful message.
-- [ ] Tapping Redeem on a partner with sufficient points shows a success state and generates a mock voucher.
-- [ ] Vouchers section lists active/existing vouchers with codes, discount amounts, status badges, and expiration.
-- [ ] Tapping "Show QR" opens a modal with the QR code rendered via `react-native-qrcode-svg`.
-- [ ] Offline banner displays, and redemption is disabled when offline.
-- [ ] Empty states render correctly for zero points, no partners, and no vouchers.
-- [ ] `APP_STATE.md` updated to ✅ for F-005.
+- [x] Points balance screen shows total points, peso value, and earned/used breakdown with mock data.
+- [x] Partner stores section renders 3+ mock partners with exchange rates and Redeem buttons.
+- [x] Redeem button is disabled when user has insufficient points, with helpful message.
+- [x] Tapping Redeem on a partner with sufficient points shows a success state and generates a mock voucher.
+- [x] Vouchers section lists active/existing vouchers with codes, discount amounts, status badges, and expiration.
+- [x] Tapping "Show QR" opens a modal with the QR code rendered via `react-native-qrcode-svg`.
+- [x] Offline banner displays, and redemption is disabled when offline.
+- [x] Empty states render correctly for zero points, no partners, and no vouchers.
+- [x] `APP_STATE.md` updated to ✅ for F-005.
 
 ### Notes
 - Requires `react-native-qrcode-svg` (already in package.json).
