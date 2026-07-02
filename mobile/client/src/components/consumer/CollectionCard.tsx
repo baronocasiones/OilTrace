@@ -81,28 +81,24 @@ export function CollectionCard({ collection, onPress }: CollectionCardProps) {
           <Label size="sm" style={[styles.columnLabel, { color: c.muted }]}>
             COLLECTED VOLUME
           </Label>
-          <View style={g.row}>
-            <Heading size="md" style={{ color: c.accent, marginTop: 2 }}>
-              {collection.volume_liters}
-            </Heading>
-            <BodyText size="sm" style={{ color: c.accent, marginLeft: 4, marginBottom: 2, alignSelf: 'flex-end', fontWeight: '600' }}>
-              Liters
+          <Heading size="md" style={{ color: c.accent, marginTop: 2 }}>
+            {collection.volume_liters}
+            <BodyText size="sm" style={{ color: c.accent, fontWeight: '600' }}>
+              {' Liters'}
             </BodyText>
-          </View>
+          </Heading>
         </View>
 
         <View style={styles.columnRight}>
           <Label size="sm" style={[styles.columnLabel, { color: c.muted }]}>
             TPM READING
           </Label>
-          <View style={g.row}>
-            <Heading size="md" style={{ marginTop: 2 }}>
-              {collection.tpm_value.toFixed(1)}
-            </Heading>
-            <BodyText size="sm" style={{ marginLeft: 2, marginBottom: 2, alignSelf: 'flex-end', fontWeight: '600' }}>
-              %
+          <Heading size="md" style={{ marginTop: 2 }}>
+            {collection.tpm_value.toFixed(1)}
+            <BodyText size="sm" style={{ fontWeight: '600' }}>
+              {' %'}
             </BodyText>
-          </View>
+          </Heading>
         </View>
       </View>
 

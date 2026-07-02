@@ -22,6 +22,7 @@ Auth → Dashboard → Request Collection → History → Points & Vouchers → 
    - `APP_STATE.md` → flip feature status to ✅
    - `FEATURES.md` → mark spec Status as Done
    - `ERROR_LOG.md` → log any errors encountered (newest first, ERR-XXX format)
+5. **Verify type safety** before committing or marking a feature as done by running `npx tsc --noEmit`. Fix any TypeScript or missing import errors immediately.
 
 ---
 
