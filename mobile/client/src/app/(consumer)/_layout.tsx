@@ -271,7 +271,7 @@ function CustomTabBar({ state, descriptors, navigation }: CustomTabBarProps) {
     styles.container,
     {
       backgroundColor: Platform.OS === 'ios' ? 'transparent' : c.glassBg,
-      borderTopColor: c.border,
+      borderTopColor: c.glassBorder,
       height: 64 + insets.bottom,
       paddingBottom: insets.bottom,
     },

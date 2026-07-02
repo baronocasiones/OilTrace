@@ -3,6 +3,7 @@ import {
   ScrollView,
   View,
   Text,
+  TextInput,
   StyleSheet,
   RefreshControl,
   Platform,
@@ -212,11 +213,331 @@ function NotificationDrawer({
   );
 }
 
+// ─── Request Collection Modal ─────────────────────────────────────────────────────
+
+interface RequestCollectionModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onSubmit: (requestType: 'on_demand' | 'scheduled', date: string, notes: string) => void;
+  theme: ReturnType<typeof useTheme>['theme'];
+  g: ReturnType<typeof createGlobalStyles>;
+}
+
+function RequestCollectionModal({
+  visible,
+  onClose,
+  onSubmit,
+  theme,
+  g,
+}: RequestCollectionModalProps) {
+  const [requestType, setRequestType] = useState<'on_demand' | 'scheduled'>('on_demand');
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const [notes, setNotes] = useState('');
+  const c = theme.colors;
+
+  const formatDateDisplay = (d: Date): string => {
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric' });
+  };
+
+  const formatDateISO = (d: Date): string => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const handleSubmit = () => {
+    const dateStr = selectedDate ? formatDateISO(selectedDate) : '';
+    onSubmit(requestType, dateStr, notes);
+    setRequestType('on_demand');
+    setSelectedDate(null);
+    setNotes('');
+    setCalendarMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  };
+
+  const handleCancel = () => {
+    setRequestType('on_demand');
+    setSelectedDate(null);
+    setNotes('');
+    setCalendarMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+    onClose();
+  };
+
+  // ── Calendar helpers ─────────────────────────────────────────────────────
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const year = calendarMonth.getFullYear();
+  const month = calendarMonth.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0=Sun
+
+  const calendarDays: (number | null)[] = [];
+  for (let i = 0; i < firstDayOfWeek; i++) calendarDays.push(null);
+  for (let i = 1; i <= daysInMonth; i++) calendarDays.push(i);
+
+  const isSameDay = (d1: Date, d2: Date) =>
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate();
+
+  const isDateSelectable = (day: number) => {
+    const d = new Date(year, month, day);
+    d.setHours(0, 0, 0, 0);
+    return d >= today;
+  };
+
+  const handleDayPress = (day: number) => {
+    if (!isDateSelectable(day)) return;
+    setSelectedDate(new Date(year, month, day));
+  };
+
+  const prevMonth = () => {
+    const prev = new Date(year, month - 1, 1);
+    setCalendarMonth(prev);
+  };
+
+  const nextMonth = () => {
+    const next = new Date(year, month + 1, 1);
+    setCalendarMonth(next);
+  };
+
+  const monthLabel = calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const WEEKDAY_HEADERS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={handleCancel}
+    >
+      <View style={styles.requestOverlay}>
+        <TouchableOpacity
+          style={styles.requestBackdrop}
+          activeOpacity={1}
+          onPress={handleCancel}
+        />
+        <View style={[styles.requestPanel, { backgroundColor: c.surface }]}>
+          {/* Header */}
+          <View style={[g.rowBetween, { marginBottom: 20 }]}>
+            <Heading size="md">Request Collection</Heading>
+            <TouchableOpacity onPress={handleCancel}>
+              <MaterialCommunityIcons name="close" size={22} color={c.muted} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Pickup Type Toggle */}
+          <View style={styles.modalSection}>
+            <Label style={{ marginBottom: 8 }}>Pickup Type</Label>
+            <View style={styles.modalTypeRow}>
+              <TouchableOpacity
+                style={[
+                  styles.modalTypeBtn,
+                  {
+                    borderColor: c.border,
+                  },
+                  requestType === 'on_demand' && {
+                    backgroundColor: c.accent,
+                    borderColor: c.accent,
+                  },
+                ]}
+                onPress={() => setRequestType('on_demand')}
+                activeOpacity={0.7}
+              >
+                <MaterialCommunityIcons
+                  name="flash"
+                  size={18}
+                  color={requestType === 'on_demand' ? '#FFF' : c.accent}
+                />
+                <Text
+                  style={[
+                    styles.modalTypeText,
+                    {
+                      color: requestType === 'on_demand' ? '#FFF' : c.foreground,
+                      fontFamily: theme.fonts.body,
+                    },
+                  ]}
+                >
+                  On-Demand
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalTypeBtn,
+                  {
+                    borderColor: c.border,
+                  },
+                  requestType === 'scheduled' && {
+                    backgroundColor: c.accent,
+                    borderColor: c.accent,
+                  },
+                ]}
+                onPress={() => setRequestType('scheduled')}
+                activeOpacity={0.7}
+              >
+                <MaterialCommunityIcons
+                  name="calendar"
+                  size={18}
+                  color={requestType === 'scheduled' ? '#FFF' : c.accent}
+                />
+                <Text
+                  style={[
+                    styles.modalTypeText,
+                    {
+                      color: requestType === 'scheduled' ? '#FFF' : c.foreground,
+                      fontFamily: theme.fonts.body,
+                    },
+                  ]}
+                >
+                  Scheduled
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <BodyText size="sm" muted style={{ marginTop: 6 }}>
+              {requestType === 'on_demand'
+                ? 'A driver will be dispatched to your location right away.'
+                : 'Choose a future date for your collection.'}
+            </BodyText>
+          </View>
+
+          {/* Date picker calendar (Scheduled only) */}
+          {requestType === 'scheduled' && (
+            <View style={styles.modalSection}>
+              <Label style={{ marginBottom: 8 }}>Pick a Date</Label>
+
+              {/* Selected date display */}
+              {selectedDate && (
+                <View style={[styles.calendarSelectedRow, { backgroundColor: hexToRgba(c.accent, 0.08) }]}>
+                  <MaterialCommunityIcons name="calendar-check" size={18} color={c.accent} />
+                  <Text style={[styles.calendarSelectedText, { color: c.accent, fontFamily: theme.fonts.body }]}>
+                    {formatDateDisplay(selectedDate)}
+                  </Text>
+                </View>
+              )}
+
+              {/* Month navigation */}
+              <View style={styles.calendarNav}>
+                <TouchableOpacity onPress={prevMonth} style={styles.calendarNavBtn} activeOpacity={0.6}>
+                  <MaterialCommunityIcons name="chevron-left" size={22} color={c.foreground} />
+                </TouchableOpacity>
+                <Text style={[styles.calendarMonthLabel, { color: c.foreground, fontFamily: theme.fonts.body }]}>
+                  {monthLabel}
+                </Text>
+                <TouchableOpacity onPress={nextMonth} style={styles.calendarNavBtn} activeOpacity={0.6}>
+                  <MaterialCommunityIcons name="chevron-right" size={22} color={c.foreground} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Weekday headers */}
+              <View style={styles.calendarGrid}>
+                {WEEKDAY_HEADERS.map((wd) => (
+                  <View key={wd} style={styles.calendarCell}>
+                    <Text style={[styles.calendarWeekday, { color: c.muted }]}>{wd}</Text>
+                  </View>
+                ))}
+
+                {/* Day cells */}
+                {calendarDays.map((day, i) => {
+                  if (day === null) {
+                    return <View key={`empty-${i}`} style={styles.calendarCell} />;
+                  }
+
+                  const dayDate = new Date(year, month, day);
+                  dayDate.setHours(0, 0, 0, 0);
+                  const isToday = isSameDay(dayDate, today);
+                  const isSelected = selectedDate && isSameDay(dayDate, selectedDate);
+                  const selectable = isDateSelectable(day);
+
+                  return (
+                    <TouchableOpacity
+                      key={`day-${day}`}
+                      style={[
+                        styles.calendarCell,
+                        isSelected && [styles.calendarDaySelected, { backgroundColor: c.accent }],
+                      ]}
+                      onPress={() => handleDayPress(day)}
+                      disabled={!selectable}
+                      activeOpacity={0.6}
+                    >
+                      <Text
+                        style={[
+                          styles.calendarDay,
+                          {
+                            color: !selectable
+                              ? c.muted + '40'  // 25% opacity
+                              : isSelected
+                                ? '#FFFFFF'
+                                : c.foreground,
+                            fontFamily: theme.fonts.body,
+                          },
+                          isToday && !isSelected && { color: c.accent, fontWeight: '700' },
+                        ]}
+                      >
+                        {day}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* Notes field */}
+          <View style={styles.modalSection}>
+            <Label style={{ marginBottom: 8 }}>Notes (optional)</Label>
+            <TextInput
+              style={[
+                styles.modalInput,
+                styles.modalTextArea,
+                {
+                  backgroundColor: c.bg,
+                  color: c.foreground,
+                  borderColor: c.border,
+                  fontFamily: theme.fonts.body,
+                },
+              ]}
+              placeholder="e.g., May laman na yung container ko"
+              placeholderTextColor={c.muted}
+              value={notes}
+              onChangeText={setNotes}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+          </View>
+
+          {/* Actions */}
+          <View style={[g.row, { justifyContent: 'flex-end', marginTop: 8, gap: 12 }]}>
+            <Button variant="glass" size="md" onPress={handleCancel}>
+              Cancel
+            </Button>
+            <Button
+              variant="solid-teal"
+              size="md"
+              onPress={handleSubmit}
+              style={{ flex: 1, maxWidth: 160 }}
+            >
+              Submit Request
+            </Button>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ─── Dashboard Screen ────────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { theme, setMode } = useTheme();
+  const { theme } = useTheme();
   const g = createGlobalStyles(theme);
   const c = theme.colors;
 
@@ -236,6 +557,7 @@ export default function DashboardScreen() {
   } = useDashboardStore();
 
   const [refreshing, setRefreshing] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
   const [showMockControls, setShowMockControls] = useState(true);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
@@ -251,7 +573,12 @@ export default function DashboardScreen() {
   }, [fetchDashboardData]);
 
   const handleRequestPickup = () => {
-    requestPickup('May laman na yung container ko');
+    setShowRequestModal(true);
+  };
+
+  const handleSubmitRequest = async (requestType: 'on_demand' | 'scheduled', date: string, notes: string) => {
+    await requestPickup(notes, requestType, date || undefined);
+    setShowRequestModal(false);
   };
 
   const dismissNotification = useCallback((id: string) => {
@@ -440,50 +767,8 @@ export default function DashboardScreen() {
             </Text>
           </View>
 
-          {/* Right: Theme Switcher + Notification Bell */}
+          {/* Right: Notification Bell */}
           <View style={styles.brandRight}>
-            {/* Theme Switcher Pills */}
-            <View
-              style={[
-                styles.themeSwitcher,
-                {
-                  backgroundColor:
-                    theme.mode === 'light'
-                      ? 'rgba(0,0,0,0.05)'
-                      : 'rgba(255,255,255,0.08)',
-                },
-              ]}
-            >
-              {(['light', 'dark', 'dim'] as const).map((m) => (
-                <TouchableOpacity
-                  key={m}
-                  style={[
-                    styles.themePill,
-                    theme.mode === m && {
-                      backgroundColor: c.accent,
-                    },
-                  ]}
-                  onPress={() => setMode(m)}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.themePillText,
-                      {
-                        color:
-                          theme.mode === m ? '#FFFFFF' : c.muted,
-                      },
-                    ]}
-                  >
-                    {m === 'light'
-                      ? 'Light'
-                      : m === 'dark'
-                        ? 'Dark'
-                        : 'Dim'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
 
             {/* Notification Bell */}
             <TouchableOpacity
@@ -877,6 +1162,15 @@ export default function DashboardScreen() {
         </View>
       )}
 
+      {/* ── Request Collection Modal ──────────────────────────────────────── */}
+      <RequestCollectionModal
+        visible={showRequestModal}
+        onClose={() => setShowRequestModal(false)}
+        onSubmit={handleSubmitRequest}
+        theme={theme}
+        g={g}
+      />
+
       {/* ── Notification Drawer Modal ─────────────────────────────────────── */}
       <NotificationDrawer
         visible={showNotifications}
@@ -934,22 +1228,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-  },
-  themeSwitcher: {
-    flexDirection: 'row',
-    borderRadius: 20,
-    padding: 3,
-    gap: 2,
-  },
-  themePill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 16,
-  },
-  themePillText: {
-    fontSize: 11,
-    fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
   },
   bellButton: {
     padding: 8,
@@ -1202,5 +1480,103 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     marginTop: 8,
     alignItems: 'center',
+  },
+
+  // Request Collection Modal
+  requestOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  requestBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  requestPanel: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalSection: {
+    marginBottom: 16,
+  },
+  modalTypeRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalTypeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  modalTypeText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    fontSize: 14,
+  },
+  modalTextArea: {
+    minHeight: 80,
+    paddingTop: 12,
+  },
+
+  // Calendar
+  calendarSelectedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  calendarSelectedText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  calendarNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  calendarNavBtn: {
+    padding: 8,
+  },
+  calendarMonthLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  calendarCell: {
+    width: '14.28%',
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarWeekday: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  calendarDay: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  calendarDaySelected: {
+    borderRadius: 20,
   },
 });

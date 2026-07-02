@@ -20,7 +20,7 @@ interface DashboardState {
 
   // Actions
   fetchDashboardData: (forceRefresh?: boolean) => Promise<void>;
-  requestPickup: (notes?: string) => Promise<void>;
+  requestPickup: (notes?: string, requestType?: 'on_demand' | 'scheduled', date?: string) => Promise<void>;
   toggleOffline: () => void;
   setMockState: (mockKey: string) => Promise<void>;
   clearCache: () => Promise<void>;
@@ -97,7 +97,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
   },
 
-  requestPickup: async (notes = '') => {
+  requestPickup: async (notes = '', requestType: 'on_demand' | 'scheduled' = 'on_demand', date?: string) => {
     const { isOffline, data } = get();
 
     if (isOffline) {
@@ -115,9 +115,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       const newRequest: NextRequest = {
         id: `req-${Math.floor(Math.random() * 100000)}`,
         status: 'pending',
-        request_type: 'on_demand',
+        request_type: requestType,
         driver_name: null,
-        scheduled_date: null,
+        scheduled_date: date || null,
       };
 
       if (data) {
