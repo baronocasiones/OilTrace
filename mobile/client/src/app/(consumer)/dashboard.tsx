@@ -3,543 +3,37 @@ import {
   ScrollView,
   View,
   Text,
-  TextInput,
   StyleSheet,
   RefreshControl,
   Platform,
   ActivityIndicator,
   TouchableOpacity,
   Image,
-  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useTheme } from '../../theme/ThemeContext';
+import { useTheme, type Theme } from '../../theme';
 import { createGlobalStyles } from '../../theme/globalStyles';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Heading, BodyText, Label } from '../../components/ui/Typography';
 import { useDashboardStore } from '../../store/dashboardStore';
-
-// ─── Types ───────────────────────────────────────────────────────────────────────
-
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  time: string;
-  read: boolean;
-}
-
-// ─── Mock Notifications ──────────────────────────────────────────────────────────
-
-const MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    id: 'n1',
-    title: 'Pickup Scheduled',
-    message: 'Your oil collection is scheduled for tomorrow at 2 PM.',
-    time: '2h ago',
-    read: false,
-  },
-  {
-    id: 'n2',
-    title: 'Points Earned',
-    message: 'You earned 240 pts from your recent collection!',
-    time: '1d ago',
-    read: false,
-  },
-  {
-    id: 'n3',
-    title: 'Driver Assigned',
-    message: 'Juan dela Cruz is on the way to your location.',
-    time: '3d ago',
-    read: true,
-  },
-  {
-    id: 'n4',
-    title: 'Collection Complete',
-    message: '5.0L premium oil collected and verified on-chain.',
-    time: '5d ago',
-    read: true,
-  },
-];
-
-// ─── Notification Drawer ─────────────────────────────────────────────────────────
-
-interface NotificationDrawerProps {
-  visible: boolean;
-  notifications: Notification[];
-  onDismiss: (id: string) => void;
-  onClearAll: () => void;
-  onClose: () => void;
-  theme: ReturnType<typeof useTheme>['theme'];
-  g: ReturnType<typeof createGlobalStyles>;
-}
-
-function NotificationDrawer({
-  visible,
-  notifications,
-  onDismiss,
-  onClearAll,
-  onClose,
-  theme,
-  g,
-}: NotificationDrawerProps) {
-  const c = theme.colors;
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <View style={[styles.notifOverlay]}>
-        <TouchableOpacity
-          style={styles.notifBackdrop}
-          activeOpacity={1}
-          onPress={onClose}
-        />
-        <GlassCard elevated style={styles.notifPanel}>
-          {/* Header */}
-          <View style={[g.rowBetween, { marginBottom: 16 }]}>
-            <View>
-              <Heading size="md">Notifications</Heading>
-              {unreadCount > 0 && (
-                <BodyText size="sm" muted>
-                  {unreadCount} unread
-                </BodyText>
-              )}
-            </View>
-            <View style={g.row}>
-              {unreadCount > 0 && (
-                <TouchableOpacity
-                  onPress={onClearAll}
-                  style={[styles.notifClearBtn, { borderColor: c.border }]}
-                >
-                  <BodyText size="sm" accent>
-                    Clear all
-                  </BodyText>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                onPress={onClose}
-                style={styles.notifCloseBtn}
-              >
-                <MaterialCommunityIcons
-                  name="close"
-                  size={22}
-                  color={c.muted}
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* List */}
-          <ScrollView
-            style={styles.notifList}
-            showsVerticalScrollIndicator={false}
-          >
-            {notifications.length === 0 ? (
-              <View style={styles.notifEmpty}>
-                <MaterialCommunityIcons
-                  name="bell-off-outline"
-                  size={32}
-                  color={c.muted}
-                />
-                <BodyText muted style={{ marginTop: 8 }}>
-                  No notifications
-                </BodyText>
-              </View>
-            ) : (
-              notifications.map((notif) => (
-                <TouchableOpacity
-                  key={notif.id}
-                  style={[
-                    styles.notifItem,
-                    !notif.read && {
-                      backgroundColor:
-                        theme.mode === 'light'
-                          ? 'rgba(0,0,0,0.03)'
-                          : 'rgba(255,255,255,0.03)',
-                    },
-                  ]}
-                  onPress={() => onDismiss(notif.id)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.notifItemContent}>
-                    <View style={styles.notifItemRow}>
-                      {/* Unread dot */}
-                      {!notif.read && (
-                        <View
-                          style={[
-                            styles.notifDot,
-                            { backgroundColor: c.accent },
-                          ]}
-                        />
-                      )}
-                      <Heading size="sm" style={!notif.read ? {} : { fontWeight: '400' }}>
-                        {notif.title}
-                      </Heading>
-                    </View>
-                    <BodyText size="sm" muted style={styles.notifMessage}>
-                      {notif.message}
-                    </BodyText>
-                    <BodyText size="sm" style={[styles.notifTime, { color: c.muted }]}>
-                      {notif.time}
-                    </BodyText>
-                  </View>
-                </TouchableOpacity>
-              ))
-            )}
-          </ScrollView>
-
-          {/* Footer */}
-          {notifications.length > 0 && (
-            <TouchableOpacity
-              style={[styles.notifFooter, { borderTopColor: c.border }]}
-              onPress={onClose}
-            >
-              <BodyText size="sm" muted>
-                Tap a notification to dismiss
-              </BodyText>
-            </TouchableOpacity>
-          )}
-        </GlassCard>
-      </View>
-    </Modal>
-  );
-}
-
-// ─── Request Collection Modal ─────────────────────────────────────────────────────
-
-interface RequestCollectionModalProps {
-  visible: boolean;
-  onClose: () => void;
-  onSubmit: (requestType: 'on_demand' | 'scheduled', date: string, notes: string) => void;
-  theme: ReturnType<typeof useTheme>['theme'];
-  g: ReturnType<typeof createGlobalStyles>;
-}
-
-function RequestCollectionModal({
-  visible,
-  onClose,
-  onSubmit,
-  theme,
-  g,
-}: RequestCollectionModalProps) {
-  const [requestType, setRequestType] = useState<'on_demand' | 'scheduled'>('on_demand');
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [calendarMonth, setCalendarMonth] = useState<Date>(() => {
-    const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1);
-  });
-  const [notes, setNotes] = useState('');
-  const c = theme.colors;
-
-  const formatDateDisplay = (d: Date): string => {
-    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric' });
-  };
-
-  const formatDateISO = (d: Date): string => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  };
-
-  const handleSubmit = () => {
-    const dateStr = selectedDate ? formatDateISO(selectedDate) : '';
-    onSubmit(requestType, dateStr, notes);
-    setRequestType('on_demand');
-    setSelectedDate(null);
-    setNotes('');
-    setCalendarMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
-  };
-
-  const handleCancel = () => {
-    setRequestType('on_demand');
-    setSelectedDate(null);
-    setNotes('');
-    setCalendarMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
-    onClose();
-  };
-
-  // ── Calendar helpers ─────────────────────────────────────────────────────
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const year = calendarMonth.getFullYear();
-  const month = calendarMonth.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0=Sun
-
-  const calendarDays: (number | null)[] = [];
-  for (let i = 0; i < firstDayOfWeek; i++) calendarDays.push(null);
-  for (let i = 1; i <= daysInMonth; i++) calendarDays.push(i);
-
-  const isSameDay = (d1: Date, d2: Date) =>
-    d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getDate() === d2.getDate();
-
-  const isDateSelectable = (day: number) => {
-    const d = new Date(year, month, day);
-    d.setHours(0, 0, 0, 0);
-    return d >= today;
-  };
-
-  const handleDayPress = (day: number) => {
-    if (!isDateSelectable(day)) return;
-    setSelectedDate(new Date(year, month, day));
-  };
-
-  const prevMonth = () => {
-    const prev = new Date(year, month - 1, 1);
-    setCalendarMonth(prev);
-  };
-
-  const nextMonth = () => {
-    const next = new Date(year, month + 1, 1);
-    setCalendarMonth(next);
-  };
-
-  const monthLabel = calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  const WEEKDAY_HEADERS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={handleCancel}
-    >
-      <View style={styles.requestOverlay}>
-        <TouchableOpacity
-          style={styles.requestBackdrop}
-          activeOpacity={1}
-          onPress={handleCancel}
-        />
-        <View style={[styles.requestPanel, { backgroundColor: c.surface }]}>
-          {/* Header */}
-          <View style={[g.rowBetween, { marginBottom: 20 }]}>
-            <Heading size="md">Request Collection</Heading>
-            <TouchableOpacity onPress={handleCancel}>
-              <MaterialCommunityIcons name="close" size={22} color={c.muted} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Pickup Type Toggle */}
-          <View style={styles.modalSection}>
-            <Label style={{ marginBottom: 8 }}>Pickup Type</Label>
-            <View style={styles.modalTypeRow}>
-              <TouchableOpacity
-                style={[
-                  styles.modalTypeBtn,
-                  {
-                    borderColor: c.border,
-                  },
-                  requestType === 'on_demand' && {
-                    backgroundColor: c.accent,
-                    borderColor: c.accent,
-                  },
-                ]}
-                onPress={() => setRequestType('on_demand')}
-                activeOpacity={0.7}
-              >
-                <MaterialCommunityIcons
-                  name="flash"
-                  size={18}
-                  color={requestType === 'on_demand' ? '#FFF' : c.accent}
-                />
-                <Text
-                  style={[
-                    styles.modalTypeText,
-                    {
-                      color: requestType === 'on_demand' ? '#FFF' : c.foreground,
-                      fontFamily: theme.fonts.body,
-                    },
-                  ]}
-                >
-                  On-Demand
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.modalTypeBtn,
-                  {
-                    borderColor: c.border,
-                  },
-                  requestType === 'scheduled' && {
-                    backgroundColor: c.accent,
-                    borderColor: c.accent,
-                  },
-                ]}
-                onPress={() => setRequestType('scheduled')}
-                activeOpacity={0.7}
-              >
-                <MaterialCommunityIcons
-                  name="calendar"
-                  size={18}
-                  color={requestType === 'scheduled' ? '#FFF' : c.accent}
-                />
-                <Text
-                  style={[
-                    styles.modalTypeText,
-                    {
-                      color: requestType === 'scheduled' ? '#FFF' : c.foreground,
-                      fontFamily: theme.fonts.body,
-                    },
-                  ]}
-                >
-                  Scheduled
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <BodyText size="sm" muted style={{ marginTop: 6 }}>
-              {requestType === 'on_demand'
-                ? 'A driver will be dispatched to your location right away.'
-                : 'Choose a future date for your collection.'}
-            </BodyText>
-          </View>
-
-          {/* Date picker calendar (Scheduled only) */}
-          {requestType === 'scheduled' && (
-            <View style={styles.modalSection}>
-              <Label style={{ marginBottom: 8 }}>Pick a Date</Label>
-
-              {/* Selected date display */}
-              {selectedDate && (
-                <View style={[styles.calendarSelectedRow, { backgroundColor: hexToRgba(c.accent, 0.08) }]}>
-                  <MaterialCommunityIcons name="calendar-check" size={18} color={c.accent} />
-                  <Text style={[styles.calendarSelectedText, { color: c.accent, fontFamily: theme.fonts.body }]}>
-                    {formatDateDisplay(selectedDate)}
-                  </Text>
-                </View>
-              )}
-
-              {/* Month navigation */}
-              <View style={styles.calendarNav}>
-                <TouchableOpacity onPress={prevMonth} style={styles.calendarNavBtn} activeOpacity={0.6}>
-                  <MaterialCommunityIcons name="chevron-left" size={22} color={c.foreground} />
-                </TouchableOpacity>
-                <Text style={[styles.calendarMonthLabel, { color: c.foreground, fontFamily: theme.fonts.body }]}>
-                  {monthLabel}
-                </Text>
-                <TouchableOpacity onPress={nextMonth} style={styles.calendarNavBtn} activeOpacity={0.6}>
-                  <MaterialCommunityIcons name="chevron-right" size={22} color={c.foreground} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Weekday headers */}
-              <View style={styles.calendarGrid}>
-                {WEEKDAY_HEADERS.map((wd) => (
-                  <View key={wd} style={styles.calendarCell}>
-                    <Text style={[styles.calendarWeekday, { color: c.muted }]}>{wd}</Text>
-                  </View>
-                ))}
-
-                {/* Day cells */}
-                {calendarDays.map((day, i) => {
-                  if (day === null) {
-                    return <View key={`empty-${i}`} style={styles.calendarCell} />;
-                  }
-
-                  const dayDate = new Date(year, month, day);
-                  dayDate.setHours(0, 0, 0, 0);
-                  const isToday = isSameDay(dayDate, today);
-                  const isSelected = selectedDate && isSameDay(dayDate, selectedDate);
-                  const selectable = isDateSelectable(day);
-
-                  return (
-                    <TouchableOpacity
-                      key={`day-${day}`}
-                      style={[
-                        styles.calendarCell,
-                        isSelected && [styles.calendarDaySelected, { backgroundColor: c.accent }],
-                      ]}
-                      onPress={() => handleDayPress(day)}
-                      disabled={!selectable}
-                      activeOpacity={0.6}
-                    >
-                      <Text
-                        style={[
-                          styles.calendarDay,
-                          {
-                            color: !selectable
-                              ? c.muted + '40'  // 25% opacity
-                              : isSelected
-                                ? '#FFFFFF'
-                                : c.foreground,
-                            fontFamily: theme.fonts.body,
-                          },
-                          isToday && !isSelected && { color: c.accent, fontWeight: '700' },
-                        ]}
-                      >
-                        {day}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          )}
-
-          {/* Notes field */}
-          <View style={styles.modalSection}>
-            <Label style={{ marginBottom: 8 }}>Notes (optional)</Label>
-            <TextInput
-              style={[
-                styles.modalInput,
-                styles.modalTextArea,
-                {
-                  backgroundColor: c.bg,
-                  color: c.foreground,
-                  borderColor: c.border,
-                  fontFamily: theme.fonts.body,
-                },
-              ]}
-              placeholder="e.g., May laman na yung container ko"
-              placeholderTextColor={c.muted}
-              value={notes}
-              onChangeText={setNotes}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-            />
-          </View>
-
-          {/* Actions */}
-          <View style={[g.row, { justifyContent: 'flex-end', marginTop: 8, gap: 12 }]}>
-            <Button variant="glass" size="md" onPress={handleCancel}>
-              Cancel
-            </Button>
-            <Button
-              variant="solid-teal"
-              size="md"
-              onPress={handleSubmit}
-              style={{ flex: 1, maxWidth: 160 }}
-            >
-              Submit Request
-            </Button>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-// ─── Dashboard Screen ────────────────────────────────────────────────────────────
+import { palette } from '../../theme/tokens';
+import {
+  NotificationDrawer,
+  type Notification,
+  MOCK_NOTIFICATIONS,
+} from '../../components/consumer/NotificationDrawer';
+import { RequestCollectionModal } from '../../components/consumer/RequestCollectionModal';
+import { SimulationControls } from '../../components/consumer/SimulationControls';
 
 export default function DashboardScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const g = createGlobalStyles(theme);
   const c = theme.colors;
+  const styles = getStyles(theme);
 
   const {
     data,
@@ -662,13 +156,12 @@ export default function DashboardScreen() {
         style={[
           styles.card,
           styles.cardAccentBorder,
-          { borderColor: hexToRgba(c.accent, 0.3) },
         ]}
       >
         <View style={g.rowBetween}>
           <View style={styles.cardContent}>
             <View style={[g.row, styles.statusHeader]}>
-              <Label style={[g.labelSm, { marginRight: 8 }]}>
+              <Label style={[g.labelSm, styles.statusLabel]}>
                 Pickup Status
               </Label>
               {req.status === 'in_progress' ? (
@@ -676,7 +169,7 @@ export default function DashboardScreen() {
                   <ActivityIndicator
                     size="small"
                     color={c.accentSecondaryDark}
-                    style={{ marginRight: 4 }}
+                    style={styles.loadingSpinner}
                   />
                   <Badge variant="standard">In Progress</Badge>
                 </View>
@@ -769,8 +262,6 @@ export default function DashboardScreen() {
 
           {/* Right: Notification Bell */}
           <View style={styles.brandRight}>
-
-            {/* Notification Bell */}
             <TouchableOpacity
               style={styles.bellButton}
               onPress={() => setShowNotifications(true)}
@@ -832,7 +323,7 @@ export default function DashboardScreen() {
         ) : isLoading && !data ? (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={c.accent} />
-            <BodyText style={{ marginTop: 16 }} muted>
+            <BodyText style={styles.loadingText} muted>
               Loading OilTrace...
             </BodyText>
           </View>
@@ -841,7 +332,7 @@ export default function DashboardScreen() {
             {/* Welcome area below brand header */}
             <View style={styles.welcomeArea}>
               <Label
-                style={[g.labelSm, { marginBottom: 2 }]}
+                style={[g.labelSm, styles.welcomeLabel]}
               >
                 ESTABLISHMENT ACCOUNT
               </Label>
@@ -973,14 +464,14 @@ export default function DashboardScreen() {
                       <BodyText
                         size="sm"
                         muted
-                        style={{ marginBottom: 8 }}
+                        style={styles.recentTpm}
                       >
                         TPM reading:{' '}
                         {data.recent_collection.tpm_value}% TPM
                       </BodyText>
 
                       <View style={g.row}>
-                        <View style={{ marginRight: 6 }}>
+                        <View style={styles.recentBadgeWrapper}>
                           <Badge
                             variant={
                               data.recent_collection.oil_grade
@@ -1002,7 +493,7 @@ export default function DashboardScreen() {
                       <BodyText
                         style={[
                           g.textAccent,
-                          { fontWeight: 'bold' },
+                          styles.recentAwardPoints,
                         ]}
                       >
                         +{data.recent_collection.points_awarded}{' '}
@@ -1047,128 +538,21 @@ export default function DashboardScreen() {
       </ScrollView>
 
       {/* ── Mock Controls Drawer ──────────────────────────────────────────── */}
-      {showMockControls && (
-        <View
-          style={[
-            styles.mockControlsContainer,
-            {
-              backgroundColor: c.surface,
-              borderTopColor: c.border,
-            },
-          ]}
-        >
-          <View style={g.rowBetween}>
-            <Label style={g.labelMd}>🧪 Simulation Controls</Label>
-            <TouchableOpacity
-              onPress={() => setShowMockControls(false)}
-            >
-              <MaterialCommunityIcons
-                name="close"
-                size={18}
-                color={c.muted}
-              />
-            </TouchableOpacity>
-          </View>
-
-          <View style={[g.row, styles.mockBtnRow]}>
-            <Button
-              variant={isOffline ? 'glass-danger' : 'glass'}
-              size="sm"
-              onPress={toggleOffline}
-              style={styles.mockBtn}
-            >
-              {isOffline ? '🔌 Go Online' : '📴 Go Offline'}
-            </Button>
-
-            <BodyText size="sm" muted style={styles.activeKeyIndicator}>
-              State:{' '}
-              <BodyText
-                size="sm"
-                accent
-                style={{ fontWeight: 'bold' }}
-              >
-                {activeMockKey}
-              </BodyText>
-            </BodyText>
-          </View>
-
-          <View style={styles.mockPresetsContainer}>
-            <Label style={[g.labelSm, { marginBottom: 6 }]}>
-              Presets:
-            </Label>
-            <View style={styles.mockPresetsGrid}>
-              {[
-                { key: 'default', label: 'Assigned Driver' },
-                { key: 'pendingRequest', label: 'Pending Request' },
-                { key: 'inProgressRequest', label: 'In Progress' },
-                { key: 'noRequest', label: 'No Pickups' },
-                { key: 'firstTime', label: 'Empty State' },
-              ].map((preset) => (
-                <TouchableOpacity
-                  key={preset.key}
-                  style={[
-                    styles.presetBadge,
-                    {
-                      borderColor: hexToRgba(c.border, 0.5),
-                      backgroundColor:
-                        theme.mode === 'light'
-                          ? 'rgba(0,0,0,0.03)'
-                          : 'rgba(255,255,255,0.04)',
-                    },
-                    activeMockKey === preset.key && {
-                      backgroundColor: hexToRgba(c.accent, 0.15),
-                      borderColor: c.accent,
-                    },
-                  ]}
-                  onPress={() => setMockState(preset.key)}
-                >
-                  <BodyText
-                    size="sm"
-                    style={
-                      activeMockKey === preset.key
-                        ? [g.textAccent, { fontWeight: 'bold' }]
-                        : g.textMuted
-                    }
-                  >
-                    {preset.label}
-                  </BodyText>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Tune toggle inside controls */}
-          <TouchableOpacity
-            style={[
-              styles.tuneToggle,
-              {
-                backgroundColor:
-                  theme.mode === 'light'
-                    ? 'rgba(0,0,0,0.04)'
-                    : 'rgba(255,255,255,0.06)',
-              },
-            ]}
-            onPress={() => setShowMockControls(false)}
-          >
-            <MaterialCommunityIcons
-              name="tune-vertical"
-              size={16}
-              color={c.muted}
-            />
-            <BodyText size="sm" muted style={{ marginLeft: 4 }}>
-              Hide controls
-            </BodyText>
-          </TouchableOpacity>
-        </View>
-      )}
+      <SimulationControls
+        visible={showMockControls}
+        isOffline={isOffline}
+        activeMockKey={activeMockKey}
+        toggleOffline={toggleOffline}
+        setMockState={setMockState}
+        onClose={() => setShowMockControls(false)}
+      />
 
       {/* ── Request Collection Modal ──────────────────────────────────────── */}
       <RequestCollectionModal
         visible={showRequestModal}
         onClose={() => setShowRequestModal(false)}
         onSubmit={handleSubmitRequest}
-        theme={theme}
-        g={g}
+        isOffline={isOffline}
       />
 
       {/* ── Notification Drawer Modal ─────────────────────────────────────── */}
@@ -1178,14 +562,10 @@ export default function DashboardScreen() {
         onDismiss={dismissNotification}
         onClearAll={clearAllNotifications}
         onClose={() => setShowNotifications(false)}
-        theme={theme}
-        g={g}
       />
     </View>
   );
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────────
 
 function hexToRgba(hex: string, opacity: number): string {
   const cleaned = hex.replace('#', '');
@@ -1195,388 +575,199 @@ function hexToRgba(hex: string, opacity: number): string {
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────────
+const getStyles = (theme: Theme) => {
+  const { colors: c, spacing: s, radii: r, fonts: f, fontSizes: fs } = theme;
 
-const styles = StyleSheet.create({
-  // Brand Header
-  brandHeader: {
-    paddingTop: Platform.OS === 'ios' ? 50 : 12,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-  },
-  brandHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  brandLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  brandLogo: {
-    height: 34,
-    width: 34,
-    marginRight: 10,
-  },
-  brandText: {
-    fontSize: 22,
-    letterSpacing: 1.2,
-    fontWeight: '800',
-  },
-  brandRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  bellButton: {
-    padding: 8,
-    position: 'relative',
-  },
-  bellBadge: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-  },
-  bellBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '700',
-    fontFamily: 'Inter-Bold',
-  },
+  return StyleSheet.create({
+    // Brand Header
+    brandHeader: {
+      paddingTop: Platform.OS === 'ios' ? s[10] * 2.5 : s[6],
+      paddingBottom: s[6],
+      paddingHorizontal: s[8],
+      borderBottomWidth: 1,
+    },
+    brandHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    brandLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    brandLogo: {
+      height: 34,
+      width: 34,
+      marginRight: s[5],
+    },
+    brandText: {
+      fontSize: fs.xl + s[1],
+      letterSpacing: theme.letterSpacings.wide,
+      fontWeight: theme.fontWeights.extrabold,
+    },
+    brandRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: s[5],
+    },
+    bellButton: {
+      padding: s[4],
+      position: 'relative',
+    },
+    bellBadge: {
+      position: 'absolute',
+      top: s[1],
+      right: s[1],
+      minWidth: s[8],
+      height: s[8],
+      borderRadius: r.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: s[1] + 1,
+    },
+    bellBadgeText: {
+      color: palette.white,
+      fontSize: fs.xxs - 1,
+      fontWeight: theme.fontWeights.bold,
+      fontFamily: f.body,
+    },
 
-  // Welcome area
-  welcomeArea: {
-    marginBottom: 20,
-  },
+    // Welcome area
+    welcomeArea: {
+      marginBottom: s[10],
+    },
+    welcomeLabel: {
+      marginBottom: s[1],
+    },
 
-  // Scroll
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    paddingBottom: 220,
-  },
-  mainContent: {
-    padding: 20,
-  },
+    // Scroll
+    scrollView: {
+      flex: 1,
+    },
+    contentContainer: {
+      paddingBottom: 220,
+    },
+    mainContent: {
+      padding: s[10],
+    },
 
-  // Points card
-  pointsCard: {
-    padding: 20,
-    marginBottom: 20,
-  },
-  pointsText: {
-    fontSize: 32,
-    marginVertical: 4,
-  },
-  pointsIconContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  pointsArrow: {
-    marginLeft: 4,
-  },
+    // Points card
+    pointsCard: {
+      padding: s[10],
+      marginBottom: s[10],
+    },
+    pointsText: {
+      fontSize: fs.display,
+      marginVertical: s[2],
+    },
+    pointsIconContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: s[4],
+    },
+    pointsArrow: {
+      marginLeft: s[2],
+    },
 
-  // Cards
-  card: {
-    padding: 16,
-    marginBottom: 20,
-  },
-  cardAccentBorder: {
-    borderColor: 'rgba(34, 122, 108, 0.3)',
-  },
-  cardContent: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  cardHeading: {
-    marginTop: 4,
-    marginBottom: 4,
-  },
-  statusHeader: {
-    marginBottom: 4,
-  },
-  iconBox: {
-    alignSelf: 'center',
-  },
+    // Cards
+    card: {
+      padding: s[8],
+      marginBottom: s[10],
+    },
+    cardAccentBorder: {
+      borderColor: hexToRgba(c.accent, 0.3),
+      borderWidth: 1,
+    },
+    cardContent: {
+      flex: 1,
+      paddingRight: s[6],
+    },
+    cardHeading: {
+      marginTop: s[2],
+      marginBottom: s[2],
+    },
+    statusHeader: {
+      marginBottom: s[2],
+    },
+    statusLabel: {
+      marginRight: s[4],
+    },
+    loadingSpinner: {
+      marginRight: s[2],
+    },
+    iconBox: {
+      alignSelf: 'center',
+    },
 
-  // Actions
-  actionContainer: {
-    marginBottom: 24,
-  },
+    // Actions
+    actionContainer: {
+      marginBottom: s[12],
+    },
 
-  // Recent
-  recentSection: {
-    marginTop: 8,
-  },
-  sectionTitle: {
-    marginBottom: 10,
-  },
-  recentVolume: {
-    marginTop: 4,
-    marginBottom: 2,
-  },
-  recentAwardContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-    gap: 8,
-  },
-  emptyText: {
-    textAlign: 'center',
-    maxWidth: '80%',
-  },
+    // Recent
+    recentSection: {
+      marginTop: s[4],
+    },
+    sectionTitle: {
+      marginBottom: s[5],
+    },
+    recentVolume: {
+      marginTop: s[2],
+      marginBottom: s[1],
+    },
+    recentTpm: {
+      marginBottom: s[4],
+    },
+    recentBadgeWrapper: {
+      marginRight: s[3],
+    },
+    recentAwardContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: s[2],
+    },
+    recentAwardPoints: {
+      fontWeight: theme.fontWeights.bold,
+    },
+    emptyContainer: {
+      alignItems: 'center',
+      paddingVertical: s[10],
+      gap: s[4],
+    },
+    emptyText: {
+      textAlign: 'center',
+      maxWidth: '80%',
+    },
 
-  // States
-  centerContainer: {
-    flex: 1,
-    height: 400,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 30,
-    gap: 16,
-  },
-  errorTitle: {
-    textAlign: 'center',
-  },
-  offlineBanner: {
-    borderRadius: 0,
-    borderWidth: 0,
-    borderBottomWidth: 1,
-    paddingVertical: 10,
-    marginTop: Platform.OS === 'ios' ? 44 : 0,
-  },
-  inputError: {
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  inputSuccess: {
-    textAlign: 'center',
-    marginTop: 8,
-  },
-
-  // Mock Controls
-  mockControlsContainer: {
-    position: 'absolute',
-    bottom: 60,
-    left: 0,
-    right: 0,
-    padding: 12,
-    borderTopWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  mockBtnRow: {
-    marginVertical: 10,
-    justifyContent: 'space-between',
-  },
-  mockBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  activeKeyIndicator: {
-    marginRight: 6,
-  },
-  mockPresetsContainer: {
-    marginTop: 4,
-  },
-  mockPresetsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  presetBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  tuneToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 6,
-    marginTop: 8,
-    borderRadius: 8,
-  },
-
-  // Notification Drawer
-  notifOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  notifBackdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-  notifPanel: {
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    padding: 20,
-    maxHeight: '70%',
-  },
-  notifClearBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginRight: 8,
-  },
-  notifCloseBtn: {
-    padding: 4,
-  },
-  notifList: {
-    maxHeight: 320,
-  },
-  notifEmpty: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  notifItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    marginBottom: 4,
-  },
-  notifItemContent: {
-    flex: 1,
-  },
-  notifItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  notifDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  notifMessage: {
-    marginBottom: 4,
-    paddingLeft: 16,
-  },
-  notifTime: {
-    paddingLeft: 16,
-    fontSize: 11,
-  },
-  notifFooter: {
-    borderTopWidth: 1,
-    paddingTop: 12,
-    marginTop: 8,
-    alignItems: 'center',
-  },
-
-  // Request Collection Modal
-  requestOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  requestBackdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-  requestPanel: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
-    paddingBottom: 40,
-  },
-  modalSection: {
-    marginBottom: 16,
-  },
-  modalTypeRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  modalTypeBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  modalTypeText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  modalInput: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    fontSize: 14,
-  },
-  modalTextArea: {
-    minHeight: 80,
-    paddingTop: 12,
-  },
-
-  // Calendar
-  calendarSelectedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    marginBottom: 12,
-  },
-  calendarSelectedText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  calendarNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  calendarNavBtn: {
-    padding: 8,
-  },
-  calendarMonthLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  calendarCell: {
-    width: '14.28%',
-    aspectRatio: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  calendarWeekday: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  calendarDay: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  calendarDaySelected: {
-    borderRadius: 20,
-  },
-});
+    // States
+    centerContainer: {
+      flex: 1,
+      height: 400,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: s[14] + 2,
+      gap: s[8],
+    },
+    loadingText: {
+      marginTop: s[8],
+    },
+    errorTitle: {
+      textAlign: 'center',
+    },
+    offlineBanner: {
+      borderRadius: r.none,
+      borderWidth: r.none,
+      borderBottomWidth: 1,
+      paddingVertical: s[5],
+      marginTop: Platform.OS === 'ios' ? 44 : 0,
+    },
+    inputError: {
+      textAlign: 'center',
+      marginTop: s[4],
+    },
+    inputSuccess: {
+      textAlign: 'center',
+      marginTop: s[4],
+    },
+  });
+};

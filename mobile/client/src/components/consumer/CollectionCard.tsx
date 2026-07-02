@@ -14,7 +14,7 @@
 
 import { View, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useTheme } from '../../theme';
+import { useTheme, type Theme } from '../../theme';
 import { createGlobalStyles } from '../../theme/globalStyles';
 import { GlassCard } from '../ui/GlassCard';
 import { Badge, type BadgeVariant } from '../ui/Badge';
@@ -58,6 +58,7 @@ export function CollectionCard({ collection, onPress }: CollectionCardProps) {
   const { theme } = useTheme();
   const g = createGlobalStyles(theme);
   const c = theme.colors;
+  const styles = getStyles(theme);
 
   const gradeInfo = GRADE_INFO[collection.oil_grade];
   const bcBadge = blockChainBadgeVariant[collection.blockchain_status];
@@ -81,9 +82,9 @@ export function CollectionCard({ collection, onPress }: CollectionCardProps) {
           <Label size="sm" style={[styles.columnLabel, { color: c.muted }]}>
             COLLECTED VOLUME
           </Label>
-          <Heading size="md" style={{ color: c.accent, marginTop: 2 }}>
+          <Heading size="md" style={{ color: c.accent, marginTop: theme.spacing[1] }}>
             {collection.volume_liters}
-            <BodyText size="sm" style={{ color: c.accent, fontWeight: '600' }}>
+            <BodyText size="sm" style={{ color: c.accent, fontWeight: theme.fontWeights.semibold, fontFamily: theme.fonts.body }}>
               {' Liters'}
             </BodyText>
           </Heading>
@@ -93,9 +94,9 @@ export function CollectionCard({ collection, onPress }: CollectionCardProps) {
           <Label size="sm" style={[styles.columnLabel, { color: c.muted }]}>
             TPM READING
           </Label>
-          <Heading size="md" style={{ marginTop: 2 }}>
+          <Heading size="md" style={{ marginTop: theme.spacing[1] }}>
             {collection.tpm_value.toFixed(1)}
-            <BodyText size="sm" style={{ fontWeight: '600' }}>
+            <BodyText size="sm" style={{ fontWeight: theme.fontWeights.semibold, fontFamily: theme.fonts.body }}>
               {' %'}
             </BodyText>
           </Heading>
@@ -114,7 +115,7 @@ export function CollectionCard({ collection, onPress }: CollectionCardProps) {
             color={c.muted}
             style={styles.txIcon}
           />
-          <Mono style={{ color: c.muted, fontSize: 12 }}>
+          <Mono style={{ color: c.muted, fontSize: theme.fontSizes.sm, fontFamily: theme.fonts.mono }}>
             {collection.blockchain_status === 'failed' ? 'N/A' : getMockHash(collection.id)}
           </Mono>
         </View>
@@ -126,45 +127,48 @@ export function CollectionCard({ collection, onPress }: CollectionCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 12,
-  },
-  topRow: {
-    marginBottom: 16,
-  },
-  boldLabel: {
-    fontWeight: '600',
-  },
-  middleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  columnLeft: {
-    flex: 1,
-    alignItems: 'flex-start',
-  },
-  columnRight: {
-    flex: 1,
-    alignItems: 'flex-end',
-  },
-  columnLabel: {
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  divider: {
-    height: 1,
-    width: '100%',
-    marginBottom: 12,
-    opacity: 0.5,
-  },
-  bottomRow: {
-    alignItems: 'center',
-  },
-  txIcon: {
-    marginRight: 6,
-  },
-});
+const getStyles = (theme: Theme) => {
+  const { spacing: s, radii: r } = theme;
+  return StyleSheet.create({
+    card: {
+      padding: s[8],
+      marginHorizontal: s[8],
+      marginBottom: s[6],
+    },
+    topRow: {
+      marginBottom: s[8],
+    },
+    boldLabel: {
+      fontWeight: theme.fontWeights.semibold,
+    },
+    middleRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: s[8],
+    },
+    columnLeft: {
+      flex: 1,
+      alignItems: 'flex-start',
+    },
+    columnRight: {
+      flex: 1,
+      alignItems: 'flex-end',
+    },
+    columnLabel: {
+      fontWeight: theme.fontWeights.semibold,
+      letterSpacing: theme.letterSpacings.wide,
+    },
+    divider: {
+      height: 1,
+      width: '100%',
+      marginBottom: s[6],
+      opacity: 0.5,
+    },
+    bottomRow: {
+      alignItems: 'center',
+    },
+    txIcon: {
+      marginRight: s[3],
+    },
+  });
+};
