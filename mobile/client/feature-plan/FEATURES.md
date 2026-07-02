@@ -217,7 +217,7 @@ Give consumers an at-a-glance view of their oil collection status, points balanc
 
 ## F-004 — Collection History
 
-**Status**: Draft  
+**Status**: Done  
 **Phase**: 2 — Consumer Dashboard  
 **Dependencies**: F-001
 
@@ -324,14 +324,14 @@ Allow consumers to review their past oil collections with quality grades, volume
 - **API error on detail** → Show error box with "Could not load collection details" + back button.
 
 ### Acceptance Criteria
-- [ ] History list renders 10+ mock collection items with grades, volumes, and blockchain badges.
-- [ ] Empty state displays when there are no collections.
-- [ ] Tapping a collection item navigates to the detail screen.
-- [ ] Detail screen shows full record: date, volume, TPM, grade, destination, driver, blockchain info.
-- [ ] Transaction hash is tappable and opens Etherscan (mock URL in mock mode).
-- [ ] Pull-to-refresh reloads the list.
-- [ ] Offline banners display appropriately on both list and detail screens.
-- [ ] `APP_STATE.md` updated to ✅ for F-004.
+- [x] History list renders 10+ mock collection items with grades, volumes, and blockchain badges.
+- [x] Empty state displays when there are no collections.
+- [x] Tapping a collection item navigates to the detail screen.
+- [x] Detail screen shows full record: date, volume, TPM, grade, destination, driver, blockchain info.
+- [x] Transaction hash is tappable and opens Etherscan (mock URL in mock mode).
+- [x] Pull-to-refresh reloads the list.
+- [x] Offline banners display appropriately on both list and detail screens.
+- [x] `APP_STATE.md` updated to ✅ for F-004.
 
 ### Notes
 - Reuses: `GlassCard`, `Badge` (all 6 variants), `Heading`, `BodyText`, `Label`, `Mono`, `Button`.

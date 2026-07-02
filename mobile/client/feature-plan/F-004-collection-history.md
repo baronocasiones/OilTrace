@@ -1,6 +1,6 @@
 # F-004 — Collection History
 
-**Status**: Draft  
+**Status**: Done  
 **Phase**: 2 — Consumer Dashboard  
 **Dependencies**: F-001
 
@@ -16,7 +16,7 @@ Allow consumers to review their past oil collections with quality grades, volume
 
 ### `app/(consumer)/history.tsx` — Collection list, Tab 2 of 4
 
-**FlatList** of collection items. Each item is a `GlassCard` (non-elevated, interactive) containing:
+**FlashList** (from `@shopify/flash-list`) of collection items to ensure 60fps scrolling performance as per best practices. Each item is a `GlassCard` (non-elevated, interactive) containing:
 
 | Element | Component | Example |
 |---|---|---|
@@ -25,6 +25,7 @@ Allow consumers to review their past oil collections with quality grades, volume
 | TPM value | `BodyText` | "18.3% TPM" |
 | Grade badge | `Badge` variant `premium`/`standard`/`danger` | Green / Yellow / Red |
 | Blockchain badge | `Badge` variant `blockchain-verified`/`blockchain-pending`/`blockchain-failed` | Checkmark / Hourglass / X |
+| View on Etherscan | `Button` variant `glass` size `sm` | Opens via `expo-web-browser` |
 
 **States**:
 - **Empty state**: "No collections yet" with `BodyText` muted and a subtle illustration/icon area.
@@ -32,7 +33,7 @@ Allow consumers to review their past oil collections with quality grades, volume
 - **Offline banner**: `g.errorBox` banner at top with "You're offline — showing cached data".
 
 **Pagination**:
-- FlatList `onEndReached` wired for future cursor-based pagination.
+- FlashList `onEndReached` wired for future cursor-based pagination.
 - In mock mode, all records load at once (10–15 items).
 
 **Navigation**:
@@ -178,14 +179,14 @@ Allow consumers to review their past oil collections with quality grades, volume
 
 ## Acceptance Criteria
 
-- [ ] History list renders 10+ mock collection items with grades, volumes, and blockchain badges.
-- [ ] Empty state displays when there are no collections.
-- [ ] Tapping a collection item navigates to the detail screen.
-- [ ] Detail screen shows full record: date, volume, TPM, grade, destination, driver, blockchain info.
-- [ ] Transaction hash is tappable and opens Etherscan (mock URL in mock mode).
-- [ ] Pull-to-refresh reloads the list.
-- [ ] Offline banners display appropriately on both list and detail screens.
-- [ ] `APP_STATE.md` updated to ✅ for F-004.
+- [x] History list renders 10+ mock collection items with grades, volumes, and blockchain badges.
+- [x] Empty state displays when there are no collections.
+- [x] Tapping a collection item navigates to the detail screen.
+- [x] Detail screen shows full record: date, volume, TPM, grade, destination, driver, blockchain info.
+- [x] Transaction hash is tappable and opens Etherscan (mock URL in mock mode).
+- [x] Pull-to-refresh reloads the list.
+- [x] Offline banners display appropriately on both list and detail screens.
+- [x] `APP_STATE.md` updated to ✅ for F-004.
 
 ## Design Reuse
 
@@ -201,8 +202,12 @@ Reuses these existing components (no new UI primitives needed):
 | `Mono` | Transaction hash display |
 | `Button` | View on Etherscan (glass), retry actions |
 
+**Global Styles (`g`)**: 
+Must strictly use `g.row`, `g.rowBetween`, `g.col`, `g.textAccent`, `g.textMuted`, etc., from `createGlobalStyles(theme)` for all layout compositions inside the cards and screens. Avoid writing custom multi-line flexbox layout CSS in feature files to maintain consistency and maximize code reuse.
+
 ## Notes
 - `expo-web-browser` is already in package.json for Etherscan deep links.
+- Needs `@shopify/flash-list` installed via `npx expo install @shopify/flash-list` to support performant scrolling.
 - A `CollectionCard` convenience component (composing GlassCard + Badge) may be extracted during implementation if repeated across Dashboard and History screens.
 - TPM values are displayed with one decimal place (e.g., "18.3%").
 - Blockchain verification is fetched on-demand when the detail screen loads, not pre-fetched for the list.

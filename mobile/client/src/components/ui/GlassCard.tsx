@@ -40,6 +40,8 @@ interface GlassCardProps extends Omit<PressableProps, 'style'> {
   style?: StyleProp<ViewStyle>;
 }
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 export function GlassCard({
   children,
   elevated = false,
@@ -79,15 +81,14 @@ export function GlassCard({
   }
 
   return (
-    <Animated.View style={[{ transform: [{ scale }] }, cardStyle]}>
-      <Pressable
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={StyleSheet.absoluteFill}
-        {...rest}
-      />
+    <AnimatedPressable
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      style={[{ transform: [{ scale }] }, cardStyle]}
+      {...rest}
+    >
       {children}
-    </Animated.View>
+    </AnimatedPressable>
   );
 }

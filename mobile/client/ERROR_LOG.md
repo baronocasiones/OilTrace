@@ -38,4 +38,44 @@ What should be done differently in the future to avoid this?
 
 <!-- Newest entries go at the top -->
 
-*(No errors logged yet — this is a great sign. Add your first entry above this line when something comes up.)*
+### ERR-002 — FlashList Missing estimatedItemSize
+
+**Date**: 2026-07-02  
+**Feature**: F-004  
+**Severity**: High  
+**Environment**: All
+
+#### Error
+Red screen crash or runtime error indicating that `FlashList requires estimatedItemSize to be set`. 
+
+#### Root Cause
+When migrating from `FlatList` to `@shopify/flash-list` for performance, the `estimatedItemSize` prop is strictly required for its internal recycling engine to function, but it was omitted.
+
+#### Fix
+Added `estimatedItemSize={120}` (or an appropriate height estimate) to the `<FlashList />` component.
+
+#### Prevention
+When implementing `FlashList` as mandated by the `react-native-best-practices` skill, always include `estimatedItemSize` alongside `data` and `renderItem`.
+
+---
+
+### ERR-001 — Expo Metro Bundler Resolution Errors / Phantom Errors
+
+**Date**: 2026-07-02  
+**Feature**: All  
+**Severity**: Blocker  
+**Environment**: All
+
+#### Error
+`npx expo start` throws resolution errors ("module not found") for new files, or the app cannot start, despite the codebase being perfectly correct and `tsc --noEmit` passing.
+
+#### Root Cause
+The `npx expo start` packager was running in an old, renamed, or deleted directory (e.g. `frontend/client` instead of `mobile/client`). The bundler was blind to the new folder structure and couldn't resolve newly created files or modules.
+
+#### Fix
+1. Killed the stale `npx expo start` terminal process.
+2. Navigated to the correct project root (`cd mobile/client`).
+3. Started the packager with a cleared cache: `npx expo start --clear`.
+
+#### Prevention
+Whenever renaming root directories or performing major structural refactoring, immediately terminate and restart the Metro bundler in the new path.
