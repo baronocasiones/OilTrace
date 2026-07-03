@@ -114,7 +114,39 @@ For detailed points system mechanics (database schema, API, settlement flow), se
 | **Net per route** | **-₱310** | **+₱1,190** |
 | **Monthly net (20 routes)** | **-₱6,200** | **+₱23,800** |
 
-The business **requires** the points model to be cash-flow positive.
+The business **performs best** with the points model, but a viable cash-based backup exists — see next section.
+
+## Backup Plan — Without Partner Funding
+
+### Why a Backup Is Needed
+
+The primary model relies on **partner-funded points** — partners absorb the discount as a marketing cost, OilTrace pays nothing. This generates ~₱1,190/route profit. However, at the startup/hackathon phase, partnerships may not yet be secured. Judges will question this dependency. A viable backup plan demonstrates that the business is not fragile.
+
+### The Levers (Can Be Combined)
+
+| Lever | Code | How It Works | Impact |
+|-------|------|-------------|--------|
+| **Buyer premium** | A | Charge buyers 10-15% more for blockchain-verified, sensor-graded oil. SAF/biodiesel producers need auditable chain-of-custody — a real market need they'll pay for. | +₱180-280/route |
+| **Lower cash payout** | B | Pay karinderyas ₱12-15/L cash instead of ₱20/L. Below the informal ₱15-30/kg rate, but compensated by scheduled pickup (no waiting), no negotiation, and legitimacy (oil goes to biofuel, not counterfeit cooking oil). | Saves ₱375-600/route |
+| **Route density** | C | 20 stops instead of 15, 100L instead of 75L. Same driver cost, more volume. | +₱600/route revenue |
+| **Grade-optimized corridors** | D | Start in QC areas where karinderyas do lighter frying (stews, rice toppings, less deep frying) — shifts grade mix toward Premium/Standard (e.g., 30/45/25 instead of 20/40/40). | +₱200-400/route |
+| **First-party points** | E | Issue OilTrace-branded points at ₱1-2/L internal cost instead of ₱15-20/L cash. Keeps karinderyas in the points ecosystem without external partners. | Saves ₱900-1,350/route vs cash |
+| **Hybrid payout** | F | Pay Premium oil (higher margin) in cash, Standard/Low oil in first-party points. Optimizes cash usage where margin is highest. | Balances cash and points |
+
+### Backup Tiers (For Team Discussion)
+
+| Tier | Levers Combined | Per-Route Net | Notes |
+|------|----------------|---------------|-------|
+| **Conservative** | A (+10%) + B (₱15/L) + C (100L) | ~₱458 | Modest but positive. Credible to judges — shows you've done the math. |
+| **Strong** | A (+15%) + B (₱12/L) + C (100L) + D (30/45/25 mix) | ~₱1,300 | Stronger profit but requires grade-optimized corridor selection. |
+| **Combination A+B+E** | A (+10%) + B (₱15/L) + E (first-party points for Low grade) | ~₱800 | Pay Premium/Standard in cash, Low grade in first-party points. |
+| **Combination A+E+F** | A (+10%) + E (first-party points) + F (cash for Premium, points for Standard/Low) | ~₱1,055 | Minimizes cash outlay. Uses points for 80% of volume at low internal cost. |
+| **Combination C+D+F** | C (100L) + D (grade-optimized) + F (hybrid payout) | ~₱1,100 | Highest volume + best grade mix + smart cash allocation. |
+| **Ultimate (all levers)** | A (+15%) + B (₱12/L) + C (100L) + D (30/45/25) + F (hybrid) | ~₱1,900 | Maximum scenario. Not all levers may be achievable simultaneously. |
+
+### How to Present This to Judges
+
+> "Our primary model uses partner-funded points, which makes the economics strongly positive at ~₱1,190/route. But we've modeled a cash-based backup that requires no partnerships — by combining buyer premiums for blockchain traceability, optimized route density, and grade-targeted corridor selection, we remain profitable even without a single partner signed. The partnerships are a growth accelerator, not a dependency."
 
 ## Per-Route Economics
 
@@ -301,3 +333,4 @@ Start with **gig model** (Option A) for pilot phase. Drivers are hired per route
 | **Monetization model** | Fixed margin (₱5/L) / Percentage (15%) / Subscription + volume fee |
 | **Driver model** | Gig / Salary + bonus / Phased |
 | **First buyer to approach** | Chemrez / RMC / Kobkiat / All in parallel |
+| **Backup plan (no partner funding)** | Conservative (A+B+C) / Strong (A+B+C+D) / A+B+E / A+E+F / C+D+F / Ultimate (all levers) |
