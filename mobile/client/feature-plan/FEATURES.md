@@ -489,4 +489,67 @@ Allow consumers to view their points balance and transaction history, browse par
 - QR modal can be implemented with React Native `Modal` or a lightweight bottom sheet using `react-native-reanimated`.
 - Partner logos are mocked with placeholder colors/gradients — no actual image URLs needed for mock phase.
 - Voucher code format: `OIL-{BRAND}-{RANDOM_6CHAR}` (e.g., "OIL-MINOLA-7F3A2B").
-- Points expiry (90 days) is backend-enforced. The consumer app displays expiry warnings — spec'd in Notifications phase (F-010).
+- Points expiry (90 days) is backend-enforced. The consumer app displays expiry warnings — spec'd in Notifications phase (F-009).
+
+---
+
+## F-010 — Profile & Settings
+
+**Status**: Done  
+**Phase**: 8 — Settings & Profile  
+**Dependencies**: F-001
+
+### Goal
+Give consumers a central place to view and edit their business profile, manage account settings, switch the app theme, and log out — all within a glassmorphic hub screen.
+
+### User Stories
+- As a consumer, I want to view and edit my business profile so my information stays accurate.
+- As a consumer, I want to update my phone number and change my password so my account stays secure.
+- As a consumer, I want to switch between light, dark, and dim themes so the app is comfortable in any lighting.
+- As a consumer, I want to see app version and legal links, and log out when needed.
+
+### Screens / UI
+- **`app/(consumer)/profile.tsx`** — Profile hub, Tab 4 of 4. ScrollView with:
+  - Profile header `GlassCard elevated` with avatar initials, business name, "Consumer" badge, address.
+  - Menu rows (`GlassCard interactive`): "Business Profile" → `profile/edit-business`, "Account Settings" → `profile/edit-account`.
+  - App Preferences (`GlassCard`): `ThemeSwitcher` 3-way segmented control (light/dark/dim) with Reanimated spring sliding pill and design-system SVG icons.
+  - App Info (`GlassCard`): version, Terms of Service, Privacy Policy links.
+  - Logout `Button variant="glass-danger" fullWidth` with confirmation dialog.
+- **`app/(consumer)/profile/edit-business.tsx`** — Edit form with `OilInput` fields for business name, address, contact number, and business type selector (4 options).
+- **`app/(consumer)/profile/edit-account.tsx`** — Account form with read-only email, editable phone, and change password section (current + new + confirm) with client-side validation.
+
+### API Contracts
+All mocked. Endpoints: `GET /consumers/me/profile`, `PUT /consumers/me/profile/business`, `PUT /consumers/me/profile/account`, `PUT /consumers/me/profile/password`.
+
+### State / Data
+- **Zustand store**: `useProfileStore` with `persist` middleware (`@oiltrace_profile_store`). Pattern matches `rewardsStore`.
+- **Actions**: `fetchProfile`, `updateBusiness`, `updateAccount`, `updatePassword`, `setTheme`, `toggleOffline`.
+- **Theme sync**: `setTheme()` calls both store persist and `ThemeContext.setMode()`.
+- **Mock data**: `src/mocks/profile.ts` with default profile. Mock password: `"password123"`.
+
+### Edge Cases & Error Handling
+- Offline → banner displayed, edit forms disable save buttons + make fields read-only.
+- Fetch error → full-screen error with retry button + pull-to-refresh.
+- Save error → inline error text below form.
+- Password validation → inline field errors (min 6 chars, must match, current password check).
+- Form validation → inline errors on required empty fields. Validation runs on save press.
+- Theme persistence → `ThemeContext` reads/writes AsyncStorage so choice survives restart.
+- Logout → `Alert.alert()` confirmation → clear store → navigate to entry route.
+
+### Acceptance Criteria
+- ✅ Profile hub renders with business name, avatar initials, badge, address, menu rows, theme switcher, app info, and logout.
+- ✅ ThemeSwitcher toggles light/dark/dim with spring animation and persists across restarts.
+- ✅ Edit Business pre-fills form, saves updates, returns to hub with updated data.
+- ✅ Edit Account allows phone update and password change with full validation.
+- ✅ All forms show inline validation errors. Save buttons disabled when offline.
+- ✅ Loading skeletons, error state with retry, pull-to-refresh all functional.
+- ✅ Logout shows confirmation dialog, clears store on confirm.
+- ✅ `npx tsc --noEmit` passes with zero errors.
+- ✅ `APP_STATE.md` updated to ✅ for F-010.
+
+### Notes
+- New UI primitive: `ThemeSwitcher` in `src/components/ui/` using Reanimated + inline SVGs.
+- `ThemeContext` needs persistence fix (AsyncStorage read on mount, write on setMode).
+- Two hidden routes in consumer layout: `profile/edit-business`, `profile/edit-account` (href: null).
+- Avatar initials derived from first letters of business name words.
+- Full spec in `feature-plan/F-010-profile-settings.md`.

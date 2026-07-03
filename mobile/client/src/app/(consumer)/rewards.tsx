@@ -384,8 +384,7 @@ export default function RewardsScreen() {
       {isOffline && (
         <View style={g.errorBox}>
           <BodyText style={g.errorText}>
-            <MaterialCommunityIcons name="wifi-off" size={16} /> You're offline —
-            showing cached data
+            <MaterialCommunityIcons name="wifi-off" size={16} /> You're offline (showing cached data)
           </BodyText>
         </View>
       )}

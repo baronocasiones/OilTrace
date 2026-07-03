@@ -20,7 +20,8 @@ import {
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useTheme } from '../../theme/ThemeContext';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useTheme, type Theme } from '../../theme';
 import { createGlobalStyles } from '../../theme/globalStyles';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Heading, BodyText } from '../../components/ui/Typography';
@@ -34,6 +35,7 @@ function SkeletonCard() {
   const { theme } = useTheme();
   const g = createGlobalStyles(theme);
   const c = theme.colors;
+  const styles = getStyles(theme);
 
   return (
     <GlassCard style={styles.skeletonCard}>
@@ -46,7 +48,7 @@ function SkeletonCard() {
           {/* TPM skeleton */}
           <View style={[styles.skelBar, { width: 80, height: 10, backgroundColor: c.border }]} />
           {/* Badges skeleton */}
-          <View style={[g.row, { gap: 6, marginTop: 8 }]}>
+          <View style={[g.row, { gap: theme.spacing[2], marginTop: theme.spacing[2] }]}>
             <View style={[styles.skelBadge, { backgroundColor: c.border }]} />
             <View style={[styles.skelBadge, { backgroundColor: c.border }]} />
           </View>
@@ -64,6 +66,7 @@ function EmptyState() {
   const { theme } = useTheme();
   const g = createGlobalStyles(theme);
   const c = theme.colors;
+  const styles = getStyles(theme);
 
   return (
     <View style={styles.emptyContainer}>
@@ -87,6 +90,7 @@ export default function HistoryScreen() {
   const { theme } = useTheme();
   const g = createGlobalStyles(theme);
   const c = theme.colors;
+  const styles = getStyles(theme);
 
   const {
     collections,
@@ -115,14 +119,14 @@ export default function HistoryScreen() {
     [router],
   );
 
-
-
   const renderItem = useCallback(
-    ({ item }: { item: CollectionListItem }) => (
-      <CollectionCard
-        collection={item}
-        onPress={() => handleCollectionPress(item.id)}
-      />
+    ({ item, index }: { item: CollectionListItem; index: number }) => (
+      <Animated.View entering={FadeInDown.delay(Math.min(index, 4) * 50).duration(200).springify().damping(15)}>
+        <CollectionCard
+          collection={item}
+          onPress={() => handleCollectionPress(item.id)}
+        />
+      </Animated.View>
     ),
     [handleCollectionPress],
   );
@@ -145,7 +149,7 @@ export default function HistoryScreen() {
           <View style={[g.errorBox, styles.offlineBanner]}>
             <BodyText style={g.errorText}>
               <MaterialCommunityIcons name="wifi-off" size={16} />{' '}
-              You're offline — showing cached data
+              You're offline (showing cached data)
             </BodyText>
           </View>
         )}
@@ -179,7 +183,7 @@ export default function HistoryScreen() {
             onPress={() => fetchHistory(true)}
             activeOpacity={0.8}
           >
-            <BodyText style={{ color: '#fff', fontWeight: '700' }}>
+            <BodyText style={{ color: c.bg, fontWeight: theme.fontWeights.bold, fontFamily: theme.fonts.body }}>
               Retry Connection
             </BodyText>
           </TouchableOpacity>
@@ -200,7 +204,7 @@ export default function HistoryScreen() {
           <View style={[g.errorBox, styles.offlineInlineBanner]}>
             <BodyText style={g.errorText}>
               <MaterialCommunityIcons name="wifi-off" size={14} />{' '}
-              Offline — cached data
+              Offline (cached)
             </BodyText>
           </View>
         )}
@@ -211,7 +215,7 @@ export default function HistoryScreen() {
         <View style={[g.errorBox, styles.offlineBanner]}>
           <BodyText style={g.errorText}>
             <MaterialCommunityIcons name="wifi-off" size={16} />{' '}
-            You're offline — showing cached data
+            You're offline (showing cached data)
           </BodyText>
         </View>
       )}
@@ -239,7 +243,6 @@ export default function HistoryScreen() {
         onRefresh={onRefresh}
         refreshing={refreshing}
         onEndReachedThreshold={0.5}
-        // Future: wire onEndReached for cursor-based pagination
       />
     </View>
   );
@@ -247,103 +250,106 @@ export default function HistoryScreen() {
 
 // ─── Styles ─────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  header: {
-    paddingTop: Platform.OS === 'ios' ? 50 : 12,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-  },
+const getStyles = (theme: Theme) => {
+  const { spacing: s, radii: r, fonts: f, fontSizes: fs } = theme;
+  return StyleSheet.create({
+    header: {
+      paddingTop: Platform.OS === 'ios' ? 50 : s[3],
+      paddingBottom: s[3],
+      paddingHorizontal: s[4],
+      borderBottomWidth: 1,
+    },
 
-  // Offline / error banners
-  offlineBanner: {
-    borderRadius: 0,
-    borderWidth: 0,
-    borderBottomWidth: 1,
-    paddingVertical: 10,
-  },
-  offlineInlineBanner: {
-    marginTop: 8,
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-  errorBanner: {
-    borderRadius: 0,
-    borderWidth: 0,
-    borderBottomWidth: 1,
-    paddingVertical: 10,
-  },
+    // Offline / error banners
+    offlineBanner: {
+      borderRadius: r.none,
+      borderWidth: r.none,
+      borderBottomWidth: 1,
+      paddingVertical: s[2] + 2,
+    },
+    offlineInlineBanner: {
+      marginTop: s[2],
+      borderRadius: r.md,
+      paddingVertical: s[1] + 2,
+      paddingHorizontal: s[2] + 2,
+    },
+    errorBanner: {
+      borderRadius: r.none,
+      borderWidth: r.none,
+      borderBottomWidth: 1,
+      paddingVertical: s[2] + 2,
+    },
 
-  // List
-  listContent: {
-    paddingTop: 16,
-    paddingBottom: 120,
-  },
-  listContentEmpty: {
-    flex: 1,
-    justifyContent: 'center',
-  },
+    // List
+    listContent: {
+      paddingTop: s[4],
+      paddingBottom: s[20] * 1.5,
+    },
+    listContentEmpty: {
+      flex: 1,
+      justifyContent: 'center',
+    },
 
-  // Empty state
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 40,
-  },
-  emptyIconBox: {
-    marginBottom: 16,
-    padding: 20,
-  },
-  emptyTitle: {
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptyText: {
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+    // Empty state
+    emptyContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: s[8],
+      paddingVertical: s[10],
+    },
+    emptyIconBox: {
+      marginBottom: s[4],
+      padding: s[5],
+    },
+    emptyTitle: {
+      marginBottom: s[2],
+      textAlign: 'center',
+    },
+    emptyText: {
+      textAlign: 'center',
+      lineHeight: 20,
+    },
 
-  // Error state
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 30,
-    gap: 16,
-  },
-  errorTitle: {
-    textAlign: 'center',
-  },
-  retryBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 9999,
-  },
+    // Error state
+    errorContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: s[7] + 2,
+      gap: s[4],
+    },
+    errorTitle: {
+      textAlign: 'center',
+    },
+    retryBtn: {
+      paddingVertical: s[3],
+      paddingHorizontal: s[6],
+      borderRadius: r.full,
+    },
 
-  // Skeleton
-  skeletonList: {
-    paddingTop: 16,
-    gap: 12,
-  },
-  skeletonCard: {
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 0,
-  },
-  skelLeft: {
-    flex: 1,
-    gap: 8,
-  },
-  skelBar: {
-    borderRadius: 4,
-    opacity: 0.4,
-  },
-  skelBadge: {
-    width: 70,
-    height: 20,
-    borderRadius: 9999,
-    opacity: 0.4,
-  },
-});
+    // Skeleton
+    skeletonList: {
+      paddingTop: s[4],
+      gap: s[3],
+    },
+    skeletonCard: {
+      padding: s[4],
+      marginHorizontal: s[4],
+      marginBottom: 0,
+    },
+    skelLeft: {
+      flex: 1,
+      gap: s[2],
+    },
+    skelBar: {
+      borderRadius: r.sm,
+      opacity: 0.4,
+    },
+    skelBadge: {
+      width: 70,
+      height: 20,
+      borderRadius: r.full,
+      opacity: 0.4,
+    },
+  });
+};

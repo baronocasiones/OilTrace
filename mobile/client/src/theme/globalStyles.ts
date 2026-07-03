@@ -240,6 +240,7 @@ export function createGlobalStyles(theme: Theme) {
       paddingVertical: spacing[1],
       borderRadius: radii.full,
       borderWidth: 1,
+      alignSelf: 'flex-start',
     },
     badgeText: {
       fontFamily: fonts.body,

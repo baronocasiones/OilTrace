@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useTheme, type Theme } from '../../theme';
 import { createGlobalStyles } from '../../theme/globalStyles';
 import { GlassCard } from '../../components/ui/GlassCard';
@@ -224,7 +225,7 @@ export default function DashboardScreen() {
         <View style={[g.errorBox, styles.offlineBanner]}>
           <BodyText style={g.errorText}>
             <MaterialCommunityIcons name="wifi-off" size={16} />{' '}
-            You're offline — showing cached data
+            You're offline (showing cached data)
           </BodyText>
         </View>
       )}
@@ -330,7 +331,10 @@ export default function DashboardScreen() {
         ) : (
           <View style={styles.mainContent}>
             {/* Welcome area below brand header */}
-            <View style={styles.welcomeArea}>
+            <Animated.View
+              entering={FadeInDown.delay(50).duration(200).springify().damping(15)}
+              style={styles.welcomeArea}
+            >
               <Label
                 style={[g.labelSm, styles.welcomeLabel]}
               >
@@ -339,55 +343,66 @@ export default function DashboardScreen() {
               <Heading size="lg" style={[g.textAccent]}>
                 {data?.business_name || 'Karinderya'}
               </Heading>
-            </View>
+            </Animated.View>
 
             {/* Points balance GlassCard */}
-            <GlassCard
-              elevated
-              interactive
-              onPress={() => router.navigate('/(consumer)/rewards')}
-              style={styles.pointsCard}
+            <Animated.View
+              entering={FadeInDown.delay(100).duration(200).springify().damping(15)}
             >
-              <View style={g.rowBetween}>
-                <View>
-                  <Label style={g.labelSm}>
-                    Available Balance
-                  </Label>
-                  <Heading
-                    size="lg"
-                    style={[g.textAccent, styles.pointsText]}
-                  >
-                    {data?.points_balance || 0} pts
-                  </Heading>
-                  <BodyText size="sm" muted>
-                    = ₱
-                    {(
-                      data?.points_peso_value || 0
-                    ).toFixed(2)}{' '}
-                    discount value
-                  </BodyText>
+              <GlassCard
+                elevated
+                interactive
+                onPress={() => router.navigate('/(consumer)/rewards')}
+                style={styles.pointsCard}
+              >
+                <View style={g.rowBetween}>
+                  <View>
+                    <Label style={g.labelSm}>
+                      Available Balance
+                    </Label>
+                    <Heading
+                      size="lg"
+                      style={[g.textAccent, styles.pointsText]}
+                    >
+                      {data?.points_balance || 0} pts
+                    </Heading>
+                    <BodyText size="sm" muted>
+                      = ₱
+                      {(
+                        data?.points_peso_value || 0
+                      ).toFixed(2)}{' '}
+                      discount value
+                    </BodyText>
+                  </View>
+                  <View style={styles.pointsIconContainer}>
+                    <MaterialCommunityIcons
+                      name="gift"
+                      size={32}
+                      color={c.accent}
+                    />
+                    <MaterialCommunityIcons
+                      name="chevron-right"
+                      size={20}
+                      color={c.muted}
+                      style={styles.pointsArrow}
+                    />
+                  </View>
                 </View>
-                <View style={styles.pointsIconContainer}>
-                  <MaterialCommunityIcons
-                    name="gift"
-                    size={32}
-                    color={c.accent}
-                  />
-                  <MaterialCommunityIcons
-                    name="chevron-right"
-                    size={20}
-                    color={c.muted}
-                    style={styles.pointsArrow}
-                  />
-                </View>
-              </View>
-            </GlassCard>
+              </GlassCard>
+            </Animated.View>
 
             {/* Next collection status */}
-            {renderNextRequestCard()}
+            <Animated.View
+              entering={FadeInDown.delay(150).duration(200).springify().damping(15)}
+            >
+              {renderNextRequestCard()}
+            </Animated.View>
 
             {/* Request Pickup Button */}
-            <View style={styles.actionContainer}>
+            <Animated.View
+              entering={FadeInDown.delay(200).duration(200).springify().damping(15)}
+              style={styles.actionContainer}
+            >
               <Button
                 variant="solid-teal"
                 fullWidth
@@ -424,11 +439,14 @@ export default function DashboardScreen() {
                   ✓ Pickup request submitted successfully!
                 </BodyText>
               )}
-            </View>
+            </Animated.View>
 
             {/* Recent collection card */}
             {data?.recent_collection ? (
-              <View style={styles.recentSection}>
+              <Animated.View
+                entering={FadeInDown.delay(250).duration(200).springify().damping(15)}
+                style={styles.recentSection}
+              >
                 <Label
                   style={[g.labelSm, styles.sectionTitle]}
                 >
@@ -507,9 +525,12 @@ export default function DashboardScreen() {
                     </View>
                   </View>
                 </GlassCard>
-              </View>
+              </Animated.View>
             ) : data && !data.recent_collection ? (
-              <View style={styles.recentSection}>
+              <Animated.View
+                entering={FadeInDown.delay(250).duration(200).springify().damping(15)}
+                style={styles.recentSection}
+              >
                 <Label
                   style={[g.labelSm, styles.sectionTitle]}
                 >
@@ -531,7 +552,7 @@ export default function DashboardScreen() {
                     </BodyText>
                   </View>
                 </GlassCard>
-              </View>
+              </Animated.View>
             ) : null}
           </View>
         )}

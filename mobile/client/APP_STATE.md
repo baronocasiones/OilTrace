@@ -26,7 +26,7 @@
 | 5 — Rewards & Points | ✅ Done |
 | 6 — Blockchain Records | 🔲 Not Started |
 | 7 — Notifications | 🔲 Not Started |
-| 8 — Settings & Profile | 🔲 Not Started |
+| 8 — Settings & Profile | ✅ Done |
 
 **Legend**: 🔲 Not Started · 🔄 In Progress · ✅ Done
 
@@ -47,7 +47,7 @@ Each row is updated when the corresponding feature spec (`FEATURES.md`) section 
 | F-007 | Driver — Active Pickup & IoT Sensor View | 🔲 | — | ESP32 data |
 | F-008 | Blockchain Record Viewer | 🔲 | — | Sepolia explorer link |
 | F-009 | Push Notifications | 🔲 | — | Expo Notifications |
-| F-010 | Profile & Settings | 🔲 | — | — |
+| F-010 | Profile & Settings | ✅ | [F-010](feature-plan/F-010-profile-settings.md) | Profile hub, edit business, edit account, ThemeSwitcher, theme persistence, logout |
 
 ---
 

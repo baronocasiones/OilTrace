@@ -206,25 +206,26 @@ function CustomTabBar({ state, descriptors, navigation }: CustomTabBarProps) {
   const insets = useSafeAreaInsets();
   const [tabBarWidth, setTabBarWidth] = useState(0);
 
-  // Filter out hidden routes (href: null) and dynamic routes
+  // Filter out hidden routes and dynamic routes to ensure only main tabs show up
   const visibleRoutes = useMemo(() => {
-    return state.routes.filter((route: any) => {
-      const { options } = descriptors[route.key];
-      if (options.href === null) return false;
-      if (route.name.includes('[') || route.name.includes(']')) return false;
-      return true;
-    });
-  }, [state.routes, descriptors]);
+    const mainTabs = ['dashboard', 'history', 'rewards', 'profile'];
+    return state.routes.filter((route: any) => mainTabs.includes(route.name));
+  }, [state.routes]);
 
   // Determine the active index among visible tabs
   const activeIndex = useMemo(() => {
-    let idx = visibleRoutes.findIndex(
-      (r: any) => r.name === state.routes[state.index].name,
-    );
-    if (idx === -1) {
-      idx = state.routes[state.index].name.startsWith('history') ? 1 : 0;
+    const currentRouteName = state.routes[state.index].name;
+    const idx = visibleRoutes.findIndex((r: any) => r.name === currentRouteName);
+    if (idx !== -1) return idx;
+
+    // Fallbacks for nested sub-routes that are hidden in the tab bar
+    if (currentRouteName.startsWith('history')) {
+      return 1; // History tab
     }
-    return idx;
+    if (currentRouteName.startsWith('profile')) {
+      return 3; // Profile tab
+    }
+    return 0; // Default to Dashboard
   }, [visibleRoutes, state.index, state.routes]);
 
   // ── Reanimated shared values ────────────────────────────────────────────────
@@ -264,8 +265,8 @@ function CustomTabBar({ state, descriptors, navigation }: CustomTabBarProps) {
     return `rgba(${r}, ${g}, ${b}, ${opacity})`;
   };
 
-  const activePillBg = hexToRgba(c.accent, 0.12);
-  const activePillBorder = hexToRgba(c.accent, 0.25);
+  const activePillBg = hexToRgba(c.accent, 0.08);
+  const activePillBorder = 'transparent';
 
   const containerStyle = [
     styles.container,
@@ -342,6 +343,8 @@ export default function ConsumerLayout() {
       <Tabs.Screen name="rewards" options={{ title: 'Rewards' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
       <Tabs.Screen name="history/[id]" options={{ href: null }} />
+      <Tabs.Screen name="profile/edit-business" options={{ href: null }} />
+      <Tabs.Screen name="profile/edit-account" options={{ href: null }} />
     </Tabs>
   );
 }

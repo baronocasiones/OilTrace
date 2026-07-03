@@ -93,7 +93,7 @@ export const PartnerCard = React.memo(function PartnerCard({
         onPress={() => onRedeem(partner)}
       >
         {hasEnoughPoints
-          ? `Redeem — ₱${Math.floor(pointsBalance * partner.discount_per_point)} off`
+          ? `Redeem (₱${Math.floor(pointsBalance * partner.discount_per_point)} off)`
           : `Need ${pointsNeeded} more pts`}
       </Button>
     </GlassCard>
