@@ -23,8 +23,10 @@ import {
   TextInput as RNTextInput,
   Animated,
   StyleSheet,
+  Pressable,
   type TextInputProps as RNTextInputProps,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../theme';
 import { createGlobalStyles } from '../../theme/globalStyles';
 import { fonts, fontSizes, fontWeights, spacing, radii, durations } from '../../theme/tokens';
@@ -35,10 +37,11 @@ interface OilInputProps extends Omit<RNTextInputProps, 'style'> {
   error?: string;
 }
 
-export function OilInput({ label, prefix, error, ...rest }: OilInputProps) {
+export function OilInput({ label, prefix, error, secureTextEntry, ...rest }: OilInputProps) {
   const { theme } = useTheme();
   const g = createGlobalStyles(theme);
   const [focused, setFocused] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const borderAnim = useRef(new Animated.Value(0)).current;
 
   const onFocus = () => {
@@ -70,11 +73,25 @@ export function OilInput({ label, prefix, error, ...rest }: OilInputProps) {
         )}
         <RNTextInput
           {...rest}
+          secureTextEntry={secureTextEntry && !isPasswordVisible}
           onFocus={onFocus}
           onBlur={onBlur}
           placeholderTextColor={theme.colors.muted}
           style={[styles.input, { color: theme.colors.foreground, flex: 1 }]}
         />
+        {secureTextEntry && (
+          <Pressable
+            onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+            style={styles.eyeIcon}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <MaterialCommunityIcons
+              name={isPasswordVisible ? 'eye-outline' : 'eye-off-outline'}
+              size={20}
+              color={theme.colors.muted}
+            />
+          </Pressable>
+        )}
       </Animated.View>
 
       {error ? (
@@ -103,5 +120,8 @@ const styles = StyleSheet.create({
   },
   errorBox: {
     marginTop: spacing[2],
+  },
+  eyeIcon: {
+    paddingLeft: spacing[2],
   },
 });
