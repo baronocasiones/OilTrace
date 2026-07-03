@@ -160,7 +160,7 @@ in the JWT:
 **GET /drivers/route?pending_only=true**
 ```json
 {
-  "route": [
+  "waypoints": [
     {
       "stop": 1,
       "request_id": "uuid",
@@ -168,7 +168,7 @@ in the JWT:
       "address": "123 Rizal St, Barangay 5",
       "latitude": 14.5832,
       "longitude": 121.0409,
-      "estimated_arrival": "10:15 AM",
+      "estimated_arrival": "8 min",
       "distance_from_prev": 1.2
     },
     {
@@ -178,7 +178,7 @@ in the JWT:
       "address": "456 Mabini Ave",
       "latitude": 14.5901,
       "longitude": 121.0450,
-      "estimated_arrival": "10:30 AM",
+      "estimated_arrival": "15 min",
       "distance_from_prev": 0.8
     }
   ],
@@ -186,6 +186,8 @@ in the JWT:
   "total_duration_min": 35
 }
 ```
+
+Returns `400` with `LOCATION_UNAVAILABLE` if the driver has no location set and no pending requests exist to infer an origin.
 
 ### Owner Endpoints
 
@@ -339,9 +341,14 @@ in the JWT:
 
 ## Route APIs
 
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| POST | `/routes/optimize` | JWT | Get optimized multi-stop route |
+| Method | Endpoint | Auth | Rate Limit | Description |
+|--------|----------|------|------------|-------------|
+| POST | `/routes/optimize` | Driver JWT | 30 req/min | Get optimized multi-stop route (generic — accepts origin + stops) |
+| GET | `/drivers/route` | Driver JWT | — | Get driver's personalized route (auto-fetches pending requests from DB) |
+
+Both endpoints are **implemented** (`app/routes/routes.py` + `app/routes/collections.py`).
+
+The `POST /routes/optimize` endpoint returns a `fallback_used` boolean indicating whether OSRM was unavailable and the haversine fallback was used.
 
 **POST /routes/optimize**
 ```json

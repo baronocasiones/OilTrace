@@ -213,12 +213,60 @@ class TestDriverCollection:
 class TestDriverRoute:
     """Driver route retrieval."""
 
-    async def test_get_route_with_pending_collections(self, driver_client):
+    async def test_get_route_with_pending_collections(
+        self, driver_client, driver_claims, db_session
+    ):
         """Driver gets a list of stops sorted by route."""
+        import uuid
+        from uuid import UUID
+        from app.models import Driver, Profile, Consumer, CollectionRequest
+
+        # Set driver's current location
+        driver = db_session.query(Driver).filter(
+            Driver.profile_id == UUID(driver_claims["sub"])
+        ).first()
+        assert driver is not None
+        driver.current_lat = 14.5800
+        driver.current_lng = 121.0400
+        db_session.commit()
+
+        # Create a consumer with location data
+        consumer_profile = Profile(
+            id=uuid.uuid4(),
+            role="consumer",
+            full_name="Test Consumer A",
+            phone="+639000000010",
+        )
+        db_session.add(consumer_profile)
+        db_session.commit()
+
+        consumer = Consumer(
+            profile_id=consumer_profile.id,
+            business_name="Aling Maria's Karinderya",
+            address="123 Rizal St, Barangay 5",
+            latitude=14.5832,
+            longitude=121.0409,
+        )
+        db_session.add(consumer)
+        db_session.commit()
+
+        # Create a pending collection request
+        req = CollectionRequest(
+            consumer_id=consumer.id,
+            status="pending",
+            request_type="on_demand",
+            notes="May pickup",
+        )
+        db_session.add(req)
+        db_session.commit()
+
+        # Call the endpoint
         resp = await driver_client.get("/drivers/route?pending_only=true")
         assert resp.status_code == 200
         data = resp.json()
-        assert "route" in data
+        assert "waypoints" in data
+        assert len(data["waypoints"]) == 1
+        assert data["waypoints"][0]["consumer_name"] == "Aling Maria's Karinderya"
         assert "total_distance_km" in data
         assert "total_duration_min" in data
 

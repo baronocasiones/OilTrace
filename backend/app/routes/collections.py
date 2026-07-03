@@ -3,11 +3,13 @@ from datetime import datetime, date
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies import require_role, parse_claims_sub
+from app.dependencies import require_role, parse_claims_sub, Claims
 from app.models import Profile, Consumer, Driver, Owner, CollectionRequest, Collection
+from app.services.route_engine import RouteEngine
 
 router = APIRouter()
 
@@ -347,11 +349,110 @@ def list_driver_history(claims: dict = Depends(require_role("driver")), db: Sess
     return db.query(Collection).filter(Collection.driver_id == driver.id).all()
 
 @router.get("/drivers/route")
-def get_driver_route(pending_only: bool = Query(True), claims: dict = Depends(require_role("driver")), db: Session = Depends(get_db)):
-    
-    # Simple mock response to satisfy the routing check in collection tests without route engine logic
+async def get_driver_route(
+    pending_only: bool = Query(True),
+    claims: Claims = Depends(require_role("driver")),
+    db: Session = Depends(get_db),
+):
+    """Get an optimized route for the current driver.
+
+    Fetches pending collection requests, optimizes stop order via
+    the RouteEngine (OSRM with nearest-neighbor fallback), and returns
+    enriched waypoints with consumer info.
+    """
+    profile_id = parse_claims_sub(claims)
+    driver = db.query(Driver).filter(Driver.profile_id == profile_id).first()
+    if not driver:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "NOT_FOUND",
+                "message": "Driver profile not found",
+                "status_code": 404,
+            },
+        )
+
+    # Determine origin location
+    origin_lat = driver.current_lat
+    origin_lng = driver.current_lng
+
+    if origin_lat is None or origin_lng is None:
+        # Fall back to the first pending request's consumer location
+        fallback_request = (
+            db.query(CollectionRequest)
+            .join(Consumer)
+            .filter(CollectionRequest.status.in_(["pending", "assigned"]))
+            .filter(
+                or_(
+                    CollectionRequest.driver_id == driver.id,
+                    CollectionRequest.driver_id.is_(None),
+                )
+            )
+            .first()
+        )
+        if fallback_request and fallback_request.consumer:
+            origin_lat = fallback_request.consumer.latitude
+            origin_lng = fallback_request.consumer.longitude
+
+    if origin_lat is None or origin_lng is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "LOCATION_UNAVAILABLE",
+                "message": (
+                    "Driver location not set and no pending requests "
+                    "available to infer an origin"
+                ),
+                "status_code": 400,
+            },
+        )
+
+    # Query pending collection requests
+    query = db.query(CollectionRequest).join(Consumer).filter(
+        CollectionRequest.status.in_(["pending", "assigned"]),
+        or_(
+            CollectionRequest.driver_id == driver.id,
+            CollectionRequest.driver_id.is_(None),
+        ),
+    )
+
+    requests = query.all()
+
+    # Build stops list from requests with known consumer coordinates
+    stops = []
+    for req in requests:
+        consumer = req.consumer
+        if consumer and consumer.latitude is not None and consumer.longitude is not None:
+            stops.append({
+                "id": str(req.id),
+                "lat": consumer.latitude,
+                "lng": consumer.longitude,
+                "consumer_name": consumer.business_name or "",
+                "address": consumer.address or "",
+            })
+
+    # Optimize the route
+    engine = RouteEngine()
+    result = await engine.optimize(origin=(origin_lat, origin_lng), stops=stops)
+
+    # Enrich waypoints with consumer information
+    stop_map = {s["id"]: s for s in stops}
+    enriched = []
+    for wp in result["waypoints"]:
+        info = stop_map.get(wp["id"], {})
+        enriched.append({
+            "stop": wp["order"],
+            "request_id": wp["id"],
+            "consumer_name": info.get("consumer_name", ""),
+            "address": info.get("address", ""),
+            "latitude": wp["latitude"],
+            "longitude": wp["longitude"],
+            "estimated_arrival": f"{wp['eta_min']} min",
+            "distance_from_prev": wp.get("distance_from_prev_km", 0),
+        })
+
     return {
-        "route": [],
-        "total_distance_km": 0.0,
-        "total_duration_min": 0
+        "waypoints": enriched,
+        "total_distance_km": result["total_distance_km"],
+        "total_duration_min": result["total_duration_min"],
     }

@@ -6,6 +6,7 @@ from slowapi.errors import RateLimitExceeded
 from app.routes.collections import router as collections_router
 from app.routes.auth import router as auth_router
 from app.routes.points import router as points_router
+from app.routes.routes import router as routes_router
 
 # ── Rate Limiting ────────────────────────────────────────────────────────────
 
@@ -26,6 +27,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.include_router(collections_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1/auth")
 app.include_router(points_router, prefix="/api/v1")
+app.include_router(routes_router, prefix="/api/v1")
 
 
 @app.get("/health")

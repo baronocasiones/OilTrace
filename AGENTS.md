@@ -5,7 +5,7 @@ Used cooking oil collection for Philippine karinderyas. IoT sensor grades oil fo
 ## Repo at a glance
 
 ```
-backend/    # FastAPI + pytest (120 tests, 51 pass, 58 pre-existing failures)
+backend/    # FastAPI + pytest (120 tests, 89 pass, 20 pre-existing failures)
 contract/   # Solidity 0.8.20 + Hardhat (~20 tests)
 mobile/     # React Native + Expo (EMPTY — not started)
 hardware/   # ESP32 PlatformIO (EMPTY — not started)
@@ -65,7 +65,7 @@ Tests are `async def` — `asyncio_mode = "auto"` in `pyproject.toml` makes this
 
 ## What's not configured
 
-No ruff, no pre-commit, no formatter, no type checker, no editorconfig. No codegen or build steps needed for Python work. Tests exercise many `app.services.*` modules that exist.
+No ruff, no pre-commit, no formatter, no type checker, no editorconfig. No codegen or build steps needed for Python work. Route engine is in `app.services.route_engine` (RouteEngine class + nearest_neighbor fallback) and `app.routes.routes` (POST /routes/optimize endpoint with 30 req/min rate limit). The `GET /drivers/route` endpoint was upgraded from a stub to real OSRM-powered logic in `app.routes.collections`.
 
 ## Commit convention
 
