@@ -24,9 +24,18 @@ class TestConsumerRequestToCollectionWorkflow:
     """Full lifecycle: consumer creates, owner assigns, driver completes."""
 
     async def test_full_consumer_request_flow(self, client, set_auth,
-                                              consumer_claims, owner_claims,
-                                              driver_claims):
+                                               consumer_claims, owner_claims,
+                                               driver_claims, db_session):
         """Consumer creates request → Owner assigns → Driver transitions → completed."""
+        from app.models import Driver
+        from uuid import UUID
+
+        # Get the actual driver UUID created by driver_claims seeding
+        driver_profile_id = UUID(driver_claims["sub"])
+        driver = db_session.query(Driver).filter(Driver.profile_id == driver_profile_id).first()
+        assert driver is not None, "Driver must be seeded by driver_claims"
+        driver_id = str(driver.id)
+
         # 1. Consumer creates a request
         set_auth(consumer_claims)
         create = await client.post(
@@ -37,11 +46,11 @@ class TestConsumerRequestToCollectionWorkflow:
         req_id = create.json()["id"]
         assert create.json()["status"] == "pending"
 
-        # 2. Owner assigns a driver
+        # 2. Owner assigns the real driver
         set_auth(owner_claims)
         assign = await client.put(
             f"/owners/requests/{req_id}/assign",
-            json={"driver_id": "test-driver-uuid"},
+            json={"driver_id": driver_id},
         )
         assert assign.status_code == 200
         assert assign.json()["status"] == "assigned"

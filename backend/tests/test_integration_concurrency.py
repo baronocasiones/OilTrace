@@ -174,9 +174,18 @@ class TestStatusTransitionRaces:
     """Race conditions in status transition flow."""
 
     async def test_duplicate_status_update_is_idempotent(
-        self, client, set_auth, consumer_claims, owner_claims, driver_claims
+        self, client, set_auth, consumer_claims, owner_claims, driver_claims, db_session
     ):
         """Same status transition sent twice → no error, final state correct."""
+        from app.models import Driver
+        from uuid import UUID
+
+        # Get the actual driver UUID created by driver_claims seeding
+        driver_profile_id = UUID(driver_claims["sub"])
+        driver = db_session.query(Driver).filter(Driver.profile_id == driver_profile_id).first()
+        assert driver is not None, "Driver must be seeded by driver_claims"
+        driver_id = str(driver.id)
+
         set_auth(consumer_claims)
         create = await client.post(
             "/consumers/requests",
@@ -184,11 +193,11 @@ class TestStatusTransitionRaces:
         )
         req_id = create.json()["id"]
 
-        # Owner assigns a real driver
+        # Owner assigns the real driver
         set_auth(owner_claims)
         assign = await client.put(
             f"/owners/requests/{req_id}/assign",
-            json={"driver_id": "dup-driver-uuid"},
+            json={"driver_id": driver_id},
         )
         assert assign.status_code == 200
 
