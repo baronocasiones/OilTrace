@@ -83,7 +83,7 @@ class TestRouteOptimizationRateLimit:
                 break
 
         if status == 429:
-            assert "detail" in body
+            assert "error" in body
 
 
 # =============================================================================

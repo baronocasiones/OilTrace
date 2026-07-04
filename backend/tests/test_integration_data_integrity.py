@@ -83,7 +83,8 @@ class TestForeignKeyConstraints:
 
         db_session.delete(p)
         db_session.commit()
-        assert db_session.query(PushDevice).filter(PushDevice.id == d.id).count() == 0
+        db_session.expire_all()
+        assert db_session.query(PushDevice).filter(PushDevice.profile_id == p.id).count() == 0
 
     def test_delete_consumer_cascades_to_requests(self, db_session):
         """Delete Consumer → their collection_requests deleted."""
@@ -305,13 +306,6 @@ class TestPointsLedgerIntegrity:
             db_session.add(e)
         db_session.commit()
 
-        total = db_session.query(
-            db_session.bind.execute(
-                text("SELECT SUM(points) FROM points_ledger WHERE consumer_id = :cid"),
-                {"cid": str(c.id)},
-            ).scalar()
-        )
-        # total is None if no rows, but we have 3 rows
         fetched = db_session.execute(
             text("SELECT SUM(points) FROM points_ledger WHERE consumer_id = :cid"),
             {"cid": str(c.id)},

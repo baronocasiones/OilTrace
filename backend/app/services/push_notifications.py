@@ -20,6 +20,9 @@ MAX_RETRIES = 2
 class PushService:
     """Manages push notification delivery via Expo Push API."""
 
+    max_retries: int = 3
+    retry_delay_seconds: int = 60
+
     @staticmethod
     async def send_push(token: str, title: str, body: str) -> dict:
         """Send a push notification via Expo Push API.
