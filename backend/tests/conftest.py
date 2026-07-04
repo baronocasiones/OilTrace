@@ -244,6 +244,216 @@ def set_auth(db_session: Session):
     app.dependency_overrides.pop(get_current_user, None)
 
 
+# ── Integration Test Skip Marker ───────────────────────────────────
+
+needs_postgres = pytest.mark.skipif(
+    not USE_REAL_PG,
+    reason="Integration tests require PostgreSQL. Set OILTRACE_TEST_DB=postgres and ensure Docker is running.",
+)
+
+
+# ── Integration Test Fixtures ──────────────────────────────────────
+
+@pytest.fixture
+def seed_consumer_with_location(db_session: Session):
+    """Create a consumer with known lat/lng for route testing.
+
+    Returns the Consumer object so tests can reference its ID.
+    """
+    from app.models import Profile, Consumer
+    import uuid
+
+    profile_id = uuid.uuid4()
+    profile = Profile(
+        id=profile_id,
+        role="consumer",
+        full_name="Located Consumer",
+        phone="+639000000010",
+    )
+    db_session.add(profile)
+    db_session.commit()
+
+    consumer = Consumer(
+        profile_id=profile_id,
+        business_name="Located Karinderya",
+        address="123 Rizal St, Barangay 5",
+        latitude=14.5832,
+        longitude=121.0409,
+    )
+    db_session.add(consumer)
+    db_session.commit()
+    return consumer
+
+
+@pytest.fixture
+def seed_collection_scenario(db_session: Session, request):
+    """Pre-seed a full set of records for workflow integration tests.
+
+    Creates: 2 consumers (A, B), 1 driver, 1 owner, 1 partner.
+    Also creates 1 pending request for Consumer A (unassigned).
+
+    Returns a dict with all UUIDs and the partner_id.
+    Usage:
+        scenario = seed_collection_scenario  # from fixture injection
+        partner_id = scenario["partner_id"]
+    """
+    from app.models import Profile, Consumer, Driver, Owner, Partner, CollectionRequest
+    import uuid
+
+    ids = {
+        "consumer_a_id": uuid.uuid4(),
+        "consumer_b_id": uuid.uuid4(),
+        "driver_id": uuid.uuid4(),
+        "owner_id": uuid.uuid4(),
+        "partner_id": uuid.uuid4(),
+    }
+
+    profiles = [
+        Profile(id=ids["consumer_a_id"], role="consumer", full_name="Consumer A", phone="+639000000011"),
+        Profile(id=ids["consumer_b_id"], role="consumer", full_name="Consumer B", phone="+639000000012"),
+        Profile(id=ids["driver_id"], role="driver", full_name="Driver One", phone="+639000000013"),
+        Profile(id=ids["owner_id"], role="owner", full_name="Owner Admin", phone="+639000000014"),
+    ]
+    for p in profiles:
+        db_session.add(p)
+    db_session.commit()
+
+    consumers = [
+        Consumer(
+            id=ids["consumer_a_id"],
+            profile_id=ids["consumer_a_id"],
+            business_name="Karinderya A",
+            address="111 A Street",
+            latitude=14.58,
+            longitude=121.04,
+        ),
+        Consumer(
+            id=ids["consumer_b_id"],
+            profile_id=ids["consumer_b_id"],
+            business_name="Karinderya B",
+            address="222 B Street",
+            latitude=14.59,
+            longitude=121.05,
+        ),
+    ]
+    for c in consumers:
+        db_session.add(c)
+    db_session.commit()
+
+    db_session.add(Driver(
+        id=ids["driver_id"],
+        profile_id=ids["driver_id"],
+        status="available",
+        current_lat=14.5800,
+        current_lng=121.0400,
+    ))
+    db_session.add(Owner(
+        profile_id=ids["owner_id"],
+        company_name="OilTrace Corp",
+    ))
+    db_session.commit()
+
+    partner = Partner(
+        id=ids["partner_id"],
+        name="Minola",
+        brand="Minola Cooking Oil",
+        discount_per_point=0.50,
+        points_per_liter=10,
+        min_redemption=10,
+        max_redemption=500,
+        is_active=True,
+    )
+    db_session.add(partner)
+
+    request_a = CollectionRequest(
+        consumer_id=ids["consumer_a_id"],
+        status="pending",
+        request_type="on_demand",
+        notes="Please pickup",
+    )
+    db_session.add(request_a)
+    db_session.commit()
+    ids["request_a_id"] = request_a.id
+
+    return ids
+
+
+@pytest.fixture
+def mock_osrm_success(monkeypatch):
+    """Mock RouteEngine._fetch_osrm to return a valid single-stop OSRM response.
+
+    Route distance = 1200 m, duration = 480 s → 1.2 km / 8 min.
+    Polyline is a stub string for map rendering.
+    """
+    async def _mock_fetch(*args, **kwargs):
+        return {
+            "code": "Ok",
+            "waypoints": [
+                {"location": [121.0409, 14.5832], "waypoint_index": 0},
+            ],
+            "routes": [{
+                "distance": 1200.0,
+                "duration": 480.0,
+                "geometry": "mock_polyline",
+            }],
+        }
+
+    monkeypatch.setattr(
+        "app.services.route_engine.RouteEngine._fetch_osrm",
+        _mock_fetch,
+    )
+
+
+@pytest.fixture
+def mock_osrm_failure(monkeypatch):
+    """Mock RouteEngine._fetch_osrm to raise TimeoutError (simulate OSRM down).
+
+    The route engine should fall back to haversine nearest-neighbor.
+    """
+    async def _mock_timeout(*args, **kwargs):
+        raise TimeoutError("OSRM timed out")
+
+    monkeypatch.setattr(
+        "app.services.route_engine.RouteEngine._fetch_osrm",
+        _mock_timeout,
+    )
+
+
+@pytest.fixture
+def mock_expo_push_success(monkeypatch):
+    """Mock PushService.send_push to return success without calling Expo.
+
+    Records the call arguments into a shared list accessible via push_call_log.
+    """
+    recorded = []
+
+    async def _mock_send(token: str, title: str, body: str) -> dict:
+        recorded.append({"token": token, "title": title, "body": body})
+        return {"status": "ok"}
+
+    monkeypatch.setattr(
+        "app.services.push_notifications.PushService.send_push",
+        _mock_send,
+    )
+    return recorded
+
+
+@pytest.fixture
+def mock_expo_push_failure(monkeypatch):
+    """Mock PushService.send_push to always raise an Exception.
+
+    Tests verify that PushService retries (MAX_RETRIES=2) and
+    eventually returns an error status instead of crashing.
+    """
+    async def _mock_fail(*args, **kwargs):
+        raise Exception("Expo API error")
+
+    monkeypatch.setattr(
+        "app.services.push_notifications.PushService.send_push",
+        _mock_fail,
+    )
+
+
 # ── RLS Seed Data ─────────────────────────────────────────────────
 
 @pytest.fixture

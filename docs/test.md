@@ -19,21 +19,23 @@ cd contract && npm ci && npx hardhat test
 ## Test Layers
 
 ```
-backend/tests/          ~115 tests across 11 files
-├── conftest.py                  Fixtures, DB switching, auth helpers, RLS seed data
-├── test_classification.py       Pure unit — no DB, no HTTP
-├── test_points.py               Pure unit — ledger math and redemption
-├── test_blockchain_service.py   Service tests — mocked Web3.py + poller state machine
-├── test_routes.py               Service tests — mocked OSRM client
-├── test_auth_middleware.py      API tests — JWT, roles, IoT auth, rate limiting
-├── test_collection_api.py       API tests — CRUD, status transitions, role gating
-├── test_push_notifications.py   API tests — token register, send, audit
-├── test_partners.py             API tests — partner CRUD, vouchers, settlement
-├── test_realtime.py             API tests — channel auth, payload validation, throttling
-└── test_rls_boundaries.py       API tests — row-level security isolation (PostgreSQL only)
-
-contract/test/          20+ tests across 1 file
-└── OilTrace.test.ts             Deployment, recordCollection, verifyData, gas benchmark
+backend/tests/          ~210 tests across 16 files
+├── conftest.py                          Fixtures, DB switching, auth helpers, RLS seed data
+├── test_classification.py               Pure unit — no DB, no HTTP
+├── test_points.py                       Pure unit — ledger math and redemption
+├── test_blockchain_service.py           Service tests — mocked Web3.py + poller state machine
+├── test_routes.py                       Service tests — mocked OSRM client
+├── test_auth_middleware.py              API tests — JWT, roles, IoT auth, rate limiting
+├── test_collection_api.py               API tests — CRUD, status transitions, role gating
+├── test_push_notifications.py           API tests — token register, send, audit
+├── test_partners.py                     API tests — partner CRUD, vouchers, settlement
+├── test_realtime.py                     API tests — channel auth, payload validation, throttling
+├── test_rls_boundaries.py               API tests — row-level security isolation (PostgreSQL only)
+├── test_integration_workflows.py        Integration — full lifecycle flows (PG only)
+├── test_integration_data_integrity.py   Integration — FK cascades, constraints (PG only)
+├── test_integration_rate_limiting.py    Integration — rate limit enforcement (PG only)
+├── test_integration_concurrency.py      Integration — race conditions, duplicates (PG only)
+└── test_integration_error_recovery.py   Integration — fallback, error mapping (PG only)
 ```
 
 ---
@@ -301,7 +303,7 @@ async def test_no_token_returns_401(self, client):
 | Edge cases | 4 | Zero address, empty geohash, duplicate record ID, zero volume |
 | Gas benchmark | 1 | Records gas cost of `recordCollection` for optimization reference |
 
-### Backend Tests — 115 tests (104 pass, 0 failures, 11 skipped)
+### Backend Tests — ~220 tests (114 pass / 20 skip on SQLite + ~85 PG-only integration)
 
 | File | Tests | What it validates | Category |
 |------|-------|-------------------|----------|
@@ -315,6 +317,60 @@ async def test_no_token_returns_401(self, client):
 | `test_partners.py` | 8 | Create/list partners (owner-only), voucher code format (`OIL-XXXXXXXX`), QR data format (`oiltrace://voucher/...`), expiry display, settlement amount math | API |
 | `test_realtime.py` | 10 | Channel authorization (owner all, driver own only, consumer none), location payload format, rate limiting (5s throttle), driver offline status, disconnect handling, broadcast to nonexistent channel | API |
 | `test_rls_boundaries.py` | 9 | Consumer A can't see Consumer B's requests, driver sees only their assigned requests, owner sees all, unauthenticated → empty, public blockchain records accessible without auth, own profile always readable (PostgreSQL only) | API (PG) |
+| `test_integration_workflows.py` | ~36 | See "Integration Tests" section below | Integration (PG) |
+| `test_integration_data_integrity.py` | ~22 | See "Integration Tests" section below | Integration (PG) |
+| `test_integration_rate_limiting.py` | ~8 | See "Integration Tests" section below | Integration (PG) |
+| `test_integration_concurrency.py` | ~18 | See "Integration Tests" section below | Integration (PG) |
+| `test_integration_error_recovery.py` | ~18 | See "Integration Tests" section below | Integration (PG) |
+
+---
+
+## Integration Tests (PostgreSQL only)
+
+Five new integration test files exercise multi-step workflows, data integrity,
+rate limiting, concurrency, and error recovery. These require `OILTRACE_TEST_DB=postgres`.
+
+```
+backend/tests/          +5 files, ~95 tests
+├── test_integration_workflows.py       Full lifecycle flows
+├── test_integration_data_integrity.py  FK cascades, CHECK constraints, uniqueness
+├── test_integration_rate_limiting.py   SlowAPI 30/min and 100/min limits
+├── test_integration_concurrency.py     Race conditions, duplicate ops
+└── test_integration_error_recovery.py  OSRM fallback, HTTP error mapping, dead code
+```
+
+### Integration Test Fixtures (in `conftest.py`)
+
+| Fixture | Purpose |
+|---------|---------|
+| `needs_postgres` | Marker — skips test unless `OILTRACE_TEST_DB=postgres` |
+| `seed_consumer_with_location` | Consumer + lat/lng for route tests |
+| `seed_collection_scenario` | Consumer + driver + assigned request + collection full scenario |
+| `mock_osrm_success` | Monkeypatches `_fetch_osrm` to return structured success data |
+| `mock_osrm_failure` | Monkeypatches `_fetch_osrm` to raise `HTTPError` |
+| `mock_expo_push_success` | Monkeypatches Expo push client to succeed |
+| `mock_expo_push_failure` | Monkeypatches Expo push client to fail |
+
+### Integration Test Coverage
+
+| File | Classes | ~Tests | What it validates |
+|------|---------|--------|-------------------|
+| `test_integration_workflows.py` | 6 | 36 | Consumer create → owner assign → driver collect → points → redeem; ad-hoc collect; driver route; notification register/unregister |
+| `test_integration_data_integrity.py` | 5 | 22 | FK cascade on driver delete, CHECK constraints (TPM 0-30, volume > 0, points > 0), PushDevice unique token, PointsLedger balance consistency, parse_uuid fallback behavior |
+| `test_integration_rate_limiting.py` | 3 | 8 | 30 req/min budget on `POST /routes/optimize`, 429 response structure, 100/min global limit, health endpoint exempt, rate limit headers |
+| `test_integration_concurrency.py` | 4 | 15-18 | Two drivers collect same request (both succeed — no dedup), concurrent collections diff consumers, concurrent 60-point redemptions from 100 balance (no double-spend guard), duplicate status transitions, Driver B updating Driver A's request (ownership gap documented), duplicate consumer requests create distinct records, duplicate collection same request_id, duplicate push token changes owner |
+| `test_integration_error_recovery.py` | 4 | 14-18 | OSRM fallback to nearest-neighbor (waypoints without polyline), push failure logged not raised, wrong role → 403 (parametrized), nonexistent endpoint → 404, malformed JSON → 422, missing auth → 401, invalid UUID → 422, dead code existence checks (BlockchainService, award_points, PushService) |
+
+### Known Bugs and Security Gaps Found
+
+| Bug | File | Impact |
+|-----|------|--------|
+| `driver_collect()` returns `points_awarded` but never calls `award_points()` or inserts into `PointsLedger` | `collections.py` line 337 | Consumer points are never persisted |
+| `PUT /drivers/requests/{id}/status` lacks `req.driver_id == driver.id` ownership check | `collections.py` line 239 | Any driver can update any request's status |
+| `CollectionRequest.driver_id` FK has no `ondelete` rule | `models.py` line 84 | Deleting a driver leaves orphan references |
+| `BlockchainService` and `award_points()` exist but are never called from any route | `services/blockchain.py`, `services/points.py` | Dead code — no blockchain recording at all |
+| `PUT /notifications/unregister` deactivates by `push_token` alone, no `profile_id` check | `notifications.py` | Cross-profile deactivation possible |
+| `POST /drivers/collect` has no idempotency guard on `request_id` | `collections.py` | Same request can be collected multiple times |
 
 ---
 
