@@ -177,10 +177,12 @@ class TestStatusTransitionRaces:
         self, client, set_auth, consumer_claims, owner_claims, driver_claims, db_session
     ):
         """Same status transition sent twice → no error, final state correct."""
+        from conftest import _seed_profile_and_role
         from app.models import Driver
         from uuid import UUID
 
-        # Get the actual driver UUID created by driver_claims seeding
+        # Pre-seed the driver so we can query its auto-generated ID before using it
+        _seed_profile_and_role(db_session, driver_claims)
         driver_profile_id = UUID(driver_claims["sub"])
         driver = db_session.query(Driver).filter(Driver.profile_id == driver_profile_id).first()
         assert driver is not None, "Driver must be seeded by driver_claims"

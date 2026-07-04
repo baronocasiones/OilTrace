@@ -22,18 +22,20 @@ pytestmark = needs_postgres
 class TestConsumerIsolation:
     """Consumer A should never see Consumer B's data."""
 
-    async def test_consumer_cannot_list_other_consumers(self, client, set_auth, mock_rls_session):
+    async def test_consumer_cannot_list_other_consumers(
+        self, client, set_auth, mock_rls_session, db_session
+    ):
         """GET /consumers/requests returns only the authenticated consumer's requests."""
         from app.models import CollectionRequest
 
-        # Seed a request for Consumer B
+        # Seed a request for Consumer B using db_session (mock_rls_session is a dict)
         req = CollectionRequest(
             consumer_id=mock_rls_session["consumer_b_id"],
             status="pending",
             request_type="on_demand",
         )
-        mock_rls_session.add(req)
-        mock_rls_session.commit()
+        db_session.add(req)
+        db_session.commit()
 
         consumer_a_claims = {
             "sub": str(mock_rls_session["consumer_a_id"]),
@@ -48,18 +50,20 @@ class TestConsumerIsolation:
         # Consumer A should see 0 requests (none were created for A)
         assert len(data) == 0
 
-    async def test_consumer_cannot_read_other_collections(self, client, set_auth, mock_rls_session):
+    async def test_consumer_cannot_read_other_collections(
+        self, client, set_auth, mock_rls_session, db_session
+    ):
         """Consumer A queries collections → only Consumer A's records appear."""
         # Seed a collection for Consumer B
         from app.models import Collection
-        mock_rls_session.add(Collection(
+        db_session.add(Collection(
             consumer_id=mock_rls_session["consumer_b_id"],
             driver_id=mock_rls_session["driver_id"],
             tpm_value=24.5,
             oil_grade="standard",
             volume_liters=5.0
         ))
-        mock_rls_session.commit()
+        db_session.commit()
 
         # Consumer A requests their collections
         consumer_a_claims = {
@@ -75,7 +79,9 @@ class TestConsumerIsolation:
         # Consumer A should see 0 collections (none were created for A)
         assert len(collections) == 0
 
-    async def test_consumer_cannot_access_anothers_request_by_id(self, client, set_auth, mock_rls_session):
+    async def test_consumer_cannot_access_anothers_request_by_id(
+        self, client, set_auth, mock_rls_session, db_session
+    ):
         """Consumer A trying to read Consumer B's request by ID → 404."""
         from app.models import CollectionRequest
 
@@ -85,8 +91,8 @@ class TestConsumerIsolation:
             status="pending",
             request_type="on_demand",
         )
-        mock_rls_session.add(req)
-        mock_rls_session.commit()
+        db_session.add(req)
+        db_session.commit()
 
         # Consumer A tries to read Consumer B's request
         consumer_a_claims = {
@@ -104,7 +110,9 @@ class TestConsumerIsolation:
 class TestDriverIsolation:
     """Drivers should only see their assigned collections."""
 
-    async def test_driver_sees_only_assigned_collections(self, client, set_auth, mock_rls_session):
+    async def test_driver_sees_only_assigned_collections(
+        self, client, set_auth, mock_rls_session, db_session
+    ):
         """Driver queries collections → only their own records."""
         from app.models import CollectionRequest, Collection
 
@@ -115,8 +123,8 @@ class TestDriverIsolation:
             request_type="on_demand",
             driver_id=mock_rls_session["driver_id"],
         )
-        mock_rls_session.add(req)
-        mock_rls_session.commit()
+        db_session.add(req)
+        db_session.commit()
 
         coll = Collection(
             request_id=req.id,
@@ -127,8 +135,8 @@ class TestDriverIsolation:
             oil_destination="blended",
             volume_liters=5.0,
         )
-        mock_rls_session.add(coll)
-        mock_rls_session.commit()
+        db_session.add(coll)
+        db_session.commit()
 
         driver_claims = {
             "sub": str(mock_rls_session["driver_id"]),
@@ -141,7 +149,9 @@ class TestDriverIsolation:
         assert resp.status_code == 200
         assert len(resp.json()) >= 1
 
-    async def test_driver_cannot_see_other_drivers_earnings(self, client, set_auth, mock_rls_session):
+    async def test_driver_cannot_see_other_drivers_earnings(
+        self, client, set_auth, mock_rls_session
+    ):
         """Driver queries history → sees only own collections."""
         driver_claims = {
             "sub": str(mock_rls_session["driver_id"]),
@@ -153,19 +163,20 @@ class TestDriverIsolation:
         resp = await client.get("/drivers/history")
         assert resp.status_code == 200
 
-    async def test_driver_cannot_list_all_consumers(self, client, set_auth, mock_rls_session):
-        """Driver accessing owner-specific endpoint → 403 or 404."""
+    async def test_driver_cannot_list_all_consumers(
+        self, client, set_auth, mock_rls_session, db_session
+    ):
+        """Driver accessing owner-specific endpoint → 403."""
         from app.models import Collection
 
         # Create a collection to ensure the driver has data
-        coll = Collection(
+        db_session.add(Collection(
             consumer_id=mock_rls_session["consumer_a_id"],
             driver_id=mock_rls_session["driver_id"],
             tpm_value=20.0, oil_grade="standard", oil_destination="blended",
             volume_liters=5.0,
-        )
-        mock_rls_session.add(coll)
-        mock_rls_session.commit()
+        ))
+        db_session.commit()
 
         driver_claims = {
             "sub": str(mock_rls_session["driver_id"]),
@@ -182,11 +193,13 @@ class TestDriverIsolation:
 class TestOwnerBypass:
     """Owner role bypasses RLS and sees everything."""
 
-    async def test_owner_can_read_all_collections(self, client, set_auth, mock_rls_session):
+    async def test_owner_can_read_all_collections(
+        self, client, set_auth, mock_rls_session, db_session
+    ):
         """Owner sees collections from all consumers."""
         # Seed collections for multiple consumers
         from app.models import Collection
-        mock_rls_session.add_all([
+        db_session.add_all([
             Collection(
                 consumer_id=mock_rls_session["consumer_a_id"],
                 driver_id=mock_rls_session["driver_id"],
@@ -200,7 +213,7 @@ class TestOwnerBypass:
                 volume_liters=5.0
             ),
         ])
-        mock_rls_session.commit()
+        db_session.commit()
 
         owner_claims = {
             "sub": str(mock_rls_session["owner_id"]),
@@ -213,8 +226,10 @@ class TestOwnerBypass:
         assert resp.status_code == 200
         assert len(resp.json()) == 2  # Both collections visible
 
-    async def test_owner_can_read_any_consumer_profile(self, client, set_auth, mock_rls_session):
-        """Owner can access their own data — owners/collections shows all."""
+    async def test_owner_can_read_any_consumer_profile(
+        self, client, set_auth, mock_rls_session
+    ):
+        """Owner can access owner-specific endpoints successfully."""
         owner_claims = {
             "sub": str(mock_rls_session["owner_id"]),
             "role": "owner",
@@ -225,7 +240,9 @@ class TestOwnerBypass:
         resp = await client.get("/owners/collections")
         assert resp.status_code == 200
 
-    async def test_owner_can_see_all_drivers_with_locations(self, client, set_auth, mock_rls_session):
+    async def test_owner_can_see_all_drivers_with_locations(
+        self, client, set_auth, mock_rls_session
+    ):
         """Owner can access owner-specific endpoints without 403."""
         owner_claims = {
             "sub": str(mock_rls_session["owner_id"]),
