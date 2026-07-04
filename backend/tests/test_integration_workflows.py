@@ -79,22 +79,15 @@ class TestConsumerRequestToCollectionWorkflow:
         self, client, set_auth, consumer_claims, driver_claims, db_session
     ):
         """Driver collects → response shows points AND PointsLedger has them."""
-        from app.models import Consumer, Profile
+        from app.models import Consumer
+        from conftest import _seed_profile_and_role
+        from uuid import UUID
 
-        # Create a consumer with a known UUID so driver_collect can resolve it
-        consumer_profile = Profile(
-            id=uuid.uuid4(), role="consumer", full_name="Points Consumer",
-            phone="+639000000020",
-        )
-        db_session.add(consumer_profile)
-        db_session.commit()
-        consumer = Consumer(
-            id=uuid.uuid4(),
-            profile_id=consumer_profile.id,
-            business_name="Points Karinderya",
-        )
-        db_session.add(consumer)
-        db_session.commit()
+        _seed_profile_and_role(db_session, consumer_claims)
+        consumer = db_session.query(Consumer).filter(
+            Consumer.profile_id == UUID(consumer_claims["sub"])
+        ).first()
+        assert consumer is not None, "Consumer must be seeded by consumer_claims"
         consumer_ref = str(consumer.id)
 
         set_auth(driver_claims)
@@ -333,12 +326,14 @@ class TestPointsRedemptionWorkflow:
         """
         from app.models import PointsLedger, Partner, Consumer, Profile
         from uuid import UUID
+        from conftest import _seed_profile_and_role
 
         # Seed a partner and a consumer
         partner = Partner(name="TestMart", min_redemption=10, max_redemption=500)
         db_session.add(partner)
         db_session.commit()
 
+        _seed_profile_and_role(db_session, consumer_claims)
         profile_id = UUID(consumer_claims["sub"])
         consumer = db_session.query(Consumer).filter(
             Consumer.profile_id == profile_id
@@ -386,11 +381,13 @@ class TestPointsRedemptionWorkflow:
         """Redeem → voucher appears in GET /consumers/vouchers."""
         from app.models import PointsLedger, Partner, Consumer
         from uuid import UUID
+        from conftest import _seed_profile_and_role
 
         partner = Partner(name="VoucherMart", min_redemption=10)
         db_session.add(partner)
         db_session.commit()
 
+        _seed_profile_and_role(db_session, consumer_claims)
         profile_id = UUID(consumer_claims["sub"])
         consumer = db_session.query(Consumer).filter(
             Consumer.profile_id == profile_id
@@ -418,11 +415,13 @@ class TestPointsRedemptionWorkflow:
         """Fresh voucher has status='active'."""
         from app.models import PointsLedger, Partner, Consumer
         from uuid import UUID
+        from conftest import _seed_profile_and_role
 
         partner = Partner(name="StatusMart", min_redemption=10)
         db_session.add(partner)
         db_session.commit()
 
+        _seed_profile_and_role(db_session, consumer_claims)
         profile_id = UUID(consumer_claims["sub"])
         consumer = db_session.query(Consumer).filter(
             Consumer.profile_id == profile_id
@@ -446,11 +445,13 @@ class TestPointsRedemptionWorkflow:
         """Balance before - points used = balance after."""
         from app.models import PointsLedger, Partner, Consumer
         from uuid import UUID
+        from conftest import _seed_profile_and_role
 
         partner = Partner(name="DeductMart", min_redemption=10)
         db_session.add(partner)
         db_session.commit()
 
+        _seed_profile_and_role(db_session, consumer_claims)
         profile_id = UUID(consumer_claims["sub"])
         consumer = db_session.query(Consumer).filter(
             Consumer.profile_id == profile_id
@@ -491,11 +492,13 @@ class TestPointsRedemptionWorkflow:
         """Points below partner's min_redemption → 400."""
         from app.models import PointsLedger, Partner, Consumer
         from uuid import UUID
+        from conftest import _seed_profile_and_role
 
         partner = Partner(name="MinMart", min_redemption=50)
         db_session.add(partner)
         db_session.commit()
 
+        _seed_profile_and_role(db_session, consumer_claims)
         profile_id = UUID(consumer_claims["sub"])
         consumer = db_session.query(Consumer).filter(
             Consumer.profile_id == profile_id
@@ -519,11 +522,13 @@ class TestPointsRedemptionWorkflow:
         """Points above partner's max_redemption → 400."""
         from app.models import PointsLedger, Partner, Consumer
         from uuid import UUID
+        from conftest import _seed_profile_and_role
 
         partner = Partner(name="MaxMart", min_redemption=10, max_redemption=50)
         db_session.add(partner)
         db_session.commit()
 
+        _seed_profile_and_role(db_session, consumer_claims)
         profile_id = UUID(consumer_claims["sub"])
         consumer = db_session.query(Consumer).filter(
             Consumer.profile_id == profile_id
@@ -563,11 +568,13 @@ class TestPointsRedemptionWorkflow:
         """Two redemptions produce different voucher codes (unique constraint)."""
         from app.models import PointsLedger, Partner, Consumer
         from uuid import UUID
+        from conftest import _seed_profile_and_role
 
         partner = Partner(name="UniqueMart", min_redemption=10)
         db_session.add(partner)
         db_session.commit()
 
+        _seed_profile_and_role(db_session, consumer_claims)
         profile_id = UUID(consumer_claims["sub"])
         consumer = db_session.query(Consumer).filter(
             Consumer.profile_id == profile_id
@@ -595,11 +602,13 @@ class TestPointsRedemptionWorkflow:
         """QR data starts with 'oiltrace://voucher/'."""
         from app.models import PointsLedger, Partner, Consumer
         from uuid import UUID
+        from conftest import _seed_profile_and_role
 
         partner = Partner(name="QRMart", min_redemption=10)
         db_session.add(partner)
         db_session.commit()
 
+        _seed_profile_and_role(db_session, consumer_claims)
         profile_id = UUID(consumer_claims["sub"])
         consumer = db_session.query(Consumer).filter(
             Consumer.profile_id == profile_id

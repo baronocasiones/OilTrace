@@ -132,6 +132,7 @@ class TestConcurrentRedemptions:
         Since the endpoint reads balance then writes, without SELECT FOR UPDATE,
         both requests could pass the balance check. Document current behavior.
         """
+        from conftest import _seed_profile_and_role
         from app.models import PointsLedger, Partner, Consumer
         from uuid import UUID
 
@@ -140,6 +141,8 @@ class TestConcurrentRedemptions:
         db_session.commit()
         partner_id = str(partner.id)
 
+        # Pre-seed consumer so the profile_id query returns a valid record
+        _seed_profile_and_role(db_session, consumer_claims)
         profile_id = UUID(consumer_claims["sub"])
         consumer = db_session.query(Consumer).filter(Consumer.profile_id == profile_id).first()
 
