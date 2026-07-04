@@ -715,10 +715,12 @@ class TestDriverRouteWorkflow:
         self, client, set_auth, driver_claims, db_session, mock_osrm_success
     ):
         """Driver without current_lat/lng uses first pending consumer's location."""
+        from conftest import _seed_profile_and_role
         from app.models import Profile, Consumer, CollectionRequest, Driver
         from uuid import UUID
 
-        # Set driver location to None
+        # Pre-seed driver and set location to None
+        _seed_profile_and_role(db_session, driver_claims)
         driver = db_session.query(Driver).filter(
             Driver.profile_id == UUID(driver_claims["sub"])
         ).first()
@@ -746,9 +748,12 @@ class TestDriverRouteWorkflow:
         self, client, set_auth, driver_claims, db_session
     ):
         """No driver location AND no pending requests → 400."""
+        from conftest import _seed_profile_and_role
         from app.models import Driver
         from uuid import UUID
 
+        # Pre-seed driver and set location to None
+        _seed_profile_and_role(db_session, driver_claims)
         driver = db_session.query(Driver).filter(
             Driver.profile_id == UUID(driver_claims["sub"])
         ).first()
@@ -777,6 +782,12 @@ class TestDriverRouteWorkflow:
         ``GET /drivers/route``'s enriched format (Option B).
         It also includes ``polyline`` and ``fallback_used`` as extras.
         """
+        from app.main import app
+        # Reset rate limiter storage so previous tests don't exhaust the budget
+        try:
+            app.state.limiter._limiter.storage.reset()
+        except Exception:
+            pass
         set_auth(driver_claims)
 
         # POST /routes/optimize now returns enriched waypoints

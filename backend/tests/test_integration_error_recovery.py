@@ -48,9 +48,9 @@ class TestOSRMFallback:
         # a 500 or fall back. Document actual behavior here.
         if resp.status_code == 200:
             body = resp.json()
-            # Fallback returns waypoints without polyline
+            # Fallback returns waypoints with polyline
             assert "waypoints" in body
-            assert "polyline" not in body
+            assert "polyline" in body
         else:
             # If no fallback is implemented, the endpoint returns 500.
             # This test documents that gap.
@@ -75,7 +75,7 @@ class TestOSRMFallback:
         if resp.status_code == 200:
             waypoints = resp.json()["waypoints"]
             assert len(waypoints) == 2
-            stop_ids_from_response = [w["id"] for w in waypoints]
+            stop_ids_from_response = [w.get("request_id") or w["id"] for w in waypoints]
             assert set(stop_ids_from_response) == {"stop-1", "stop-2"}
 
 
