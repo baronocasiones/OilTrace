@@ -47,7 +47,7 @@ class TestRouteOptimization:
         assert resp.status_code == 200
         data = resp.json()
         assert len(data["waypoints"]) == 1
-        assert data["waypoints"][0]["order"] == 1
+        assert data["waypoints"][0]["stop"] == 1
 
     async def test_route_with_zero_stops(self, driver_client):
         """No pending collections → empty route."""

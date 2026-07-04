@@ -102,10 +102,15 @@ async def unregister_device(
     """Deactivate a device push token (logout).
 
     Sets ``is_active = False`` so the token is no longer used for delivery.
+    Only deactivates tokens owned by the authenticated user.
     """
+    profile_id = uuid.UUID(current_user["sub"])
     device = (
         db.query(PushDevice)
-        .filter(PushDevice.push_token == body.push_token)
+        .filter(
+            PushDevice.push_token == body.push_token,
+            PushDevice.profile_id == profile_id,
+        )
         .first()
     )
 

@@ -216,11 +216,10 @@ class TestHTTPErrorMapping:
 # =============================================================================
 
 class TestDeadCodePaths:
-    """Known dead code paths that exist but are never called from routes.
+    """Known dead code paths and newly-wired paths.
 
-    These test documents the gap so it can be addressed when the routes
-    are refactored. They are NOT xfailed — they pass by asserting
-    existence without requiring correct routing.
+    Tests verify that services exist and document which routes
+    call (or don't call) them. NOT xfailed.
     """
 
     async def test_blockchain_service_exists_but_is_dead_code(self):
@@ -237,11 +236,14 @@ class TestDeadCodePaths:
         for method_name in expected_methods:
             assert hasattr(bs, method_name), f"BlockchainService.{method_name} does not exist"
 
-    async def test_award_points_exists_but_is_dead_code(self):
-        """award_points() function exists but is never called from any route."""
+    async def test_award_points_is_now_wired_into_collections(self):
+        """award_points() is now called from driver_collect() — no longer dead code.
+
+        The function exists and has the expected signature for awarding
+        points from collections.
+        """
         from app.services.points import award_points
         assert callable(award_points)
-        # Actual signature: (db, consumer_id, collection_id, volume_liters)
         import inspect
         sig = inspect.signature(award_points)
         params = list(sig.parameters.keys())

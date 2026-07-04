@@ -29,8 +29,8 @@ class TestConcurrentCollections:
     ):
         """Two drivers collect the same request_id concurrently.
 
-        Current behavior: both succeed because there's no duplicate
-        prevention on request_id in the Collection table. Document this.
+        With idempotency guard: first creates the collection, second
+        returns the existing one (points_awarded=0). Both get 200.
         """
         from app.models import Profile, Consumer, Driver, CollectionRequest
 
@@ -208,10 +208,10 @@ class TestStatusTransitionRaces:
     async def test_driver_status_update_cross_driver(
         self, client, set_auth, db_session, consumer_claims, owner_claims
     ):
-        """Driver A creates → Driver B can update status (missing ownership check).
+        """Driver B cannot update a request assigned to Driver A.
 
-        This documents a security gap: PUT /drivers/requests/{id}/status
-        does not verify the request is assigned to the requesting driver.
+        Ownership check added: PUT /drivers/requests/{id}/status verifies
+        req.driver_id matches the authenticated driver before allowing the update.
         """
         from app.models import Profile, Driver
 
@@ -238,7 +238,7 @@ class TestStatusTransitionRaces:
             json={"driver_id": "test-driver-uuid"},
         )
 
-        # Driver B updates the status (should fail but currently succeeds)
+        # Driver B tries to update the status → 403
         from app.dependencies import get_current_user
         from app.main import app
         b_claims = {"sub": str(d2_p.id), "role": "driver", "phone": "+639000000200", "full_name": "Driver B"}
@@ -250,13 +250,8 @@ class TestStatusTransitionRaces:
         )
         app.dependency_overrides.pop(get_current_user, None)
 
-        # ═══════════════════════════════════════════════════════════════
-        # SECURITY GAP: Driver B can update a request not assigned to them
-        # This succeeds because the endpoint never checks driver ownership.
-        # ═══════════════════════════════════════════════════════════════
-        assert resp.status_code == 200, (
-            "BUG/RLS GAP: Driver B should get 403 for updating another "
-            "driver's request, but no ownership check exists."
+        assert resp.status_code == 403, (
+            "Driver B should be rejected with 403 — request is assigned to Driver A."
         )
 
 
@@ -280,7 +275,7 @@ class TestDuplicateOperations:
     async def test_duplicate_driver_collection_same_request_id(
         self, client, set_auth, db_session, driver_claims
     ):
-        """Same request_id collected twice → both succeed (no idempotency key)."""
+        """Same request_id collected twice → idempotent (same collection_id)."""
         from app.models import Profile, Consumer, CollectionRequest
 
         c_p = Profile(id=uuid.uuid4(), role="consumer", full_name="Dup Coll C", phone="+639000000300")
@@ -312,10 +307,11 @@ class TestDuplicateOperations:
                 "consumer_ref": str(consumer.id),
             },
         )
-        # Both succeed (repeated collection on same request_id)
+        # Idempotent: same collection_id, second returns points_awarded=0
         assert r1.status_code == 200
         assert r2.status_code == 200
-        assert r1.json()["collection_id"] != r2.json()["collection_id"]
+        assert r1.json()["collection_id"] == r2.json()["collection_id"]
+        assert r2.json()["points_awarded"] == 0
 
     async def test_duplicate_push_token_different_profiles(
         self, client, set_auth, consumer_claims, driver_claims

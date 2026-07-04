@@ -122,7 +122,7 @@ def redeem_points(
     return new_balance, voucher
 
 
-async def award_points(db: Session, consumer_id: uuid.UUID, collection_id: uuid.UUID, volume_liters: float) -> PointsLedgerModel:
+def award_points(db: Session, consumer_id: uuid.UUID, collection_id: uuid.UUID, volume_liters: float) -> PointsLedgerModel:
     """Database-bound async service operation to award points to a consumer for a collection."""
     points_earned = calculate_points_earned(volume_liters)
     

@@ -180,12 +180,11 @@ class TestForeignKeyConstraints:
         db_session.refresh(entry)
         assert entry.collection_id is None
 
-    def test_delete_driver_does_not_cascade_to_request(self, db_session):
-        """Delete Driver → CollectionRequest.driver_id remains (no ondelete).
+    def test_delete_driver_sets_null_on_request_driver_id(self, db_session):
+        """Delete Driver → CollectionRequest.driver_id SET NULL.
 
-        The FK on collection_requests.driver_id has no ON DELETE rule.
-        After deleting a driver, the request still references the driver UUID
-        even though the driver no longer exists.
+        The FK on collection_requests.driver_id now has ON DELETE SET NULL.
+        After deleting a driver, the request's driver_id is set to null.
         """
         from app.models import Profile, Consumer, Driver, CollectionRequest
 
@@ -208,10 +207,10 @@ class TestForeignKeyConstraints:
         db_session.delete(d)
         db_session.commit()
 
-        # The request still exists with a stale driver_id
+        # The request survives with driver_id set to NULL
         orphan = db_session.query(CollectionRequest).filter(CollectionRequest.id == req.id).first()
         assert orphan is not None
-        assert orphan.driver_id is not None  # No cascade nullify
+        assert orphan.driver_id is None  # SET NULL
 
     def test_device_token_requires_valid_profile(self, db_session):
         """Insert PushDevice with non-existent profile_id → FK violation."""

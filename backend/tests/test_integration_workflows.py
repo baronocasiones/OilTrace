@@ -64,15 +64,10 @@ class TestConsumerRequestToCollectionWorkflow:
         assert complete.status_code == 200
         assert complete.json()["status"] == "completed"
 
-    async def test_driver_collect_awards_points_in_response_not_ledger(
+    async def test_driver_collect_persists_points_in_ledger(
         self, client, set_auth, consumer_claims, driver_claims, db_session
     ):
-        """Driver collects → response shows points, but ledger is empty (known bug).
-
-        Points are calculated inline in driver_collect() and returned in the
-        response, but ``award_points()`` from ``services/points.py`` is never
-        called. The PointsLedger table remains empty.
-        """
+        """Driver collects → response shows points AND PointsLedger has them."""
         from app.models import Consumer, Profile
 
         # Create a consumer with a known UUID so driver_collect can resolve it
@@ -103,20 +98,13 @@ class TestConsumerRequestToCollectionWorkflow:
         assert collect.status_code == 200
         assert collect.json()["points_awarded"] == 50  # 5L × 10 pts/L
 
-        # Now check the consumer's points balance via the API
+        # The consumer's points balance should now show 50
         set_auth(consumer_claims)
         balance_resp = await client.get("/consumers/points")
-
-        # ═══════════════════════════════════════════════════════════════════
-        # KNOWN BUG  —  points_awarded is returned in the collect response
-        # but NEVER written to the PointsLedger.  The balance is always 0.
-        # Remove this xfail when driver_collect() calls award_points().
-        # ═══════════════════════════════════════════════════════════════════
         if balance_resp.status_code == 200:
             balance_data = balance_resp.json()
-            assert balance_data["balance"] == 0, (
-                "BUG: Points were returned in collect response but not persisted. "
-                "Expected 0 until award_points() is wired into driver_collect()."
+            assert balance_data["balance"] == 50, (
+                "Points should be persisted in PointsLedger after collection."
             )
 
     async def test_consumer_lists_only_own_requests(self, client, set_auth,
@@ -328,9 +316,9 @@ class TestPointsRedemptionWorkflow:
     ):
         """Manually insert ledger entries, then redeem via API.
 
-        Uses direct DB inserts for earning (circumvents the known
-        points-not-persisted bug in driver_collect()) to verify
-        the redeem → voucher → ledger pipeline.
+        Earning is now handled by award_points() called from driver_collect().
+        This test uses direct DB inserts for predictable balance seeding
+        to verify the redeem → voucher → ledger pipeline in isolation.
         """
         from app.models import PointsLedger, Partner, Consumer, Profile
         from uuid import UUID
@@ -760,47 +748,40 @@ class TestDriverRouteWorkflow:
         resp = await client.get("/drivers/route")
         assert resp.status_code == 403
 
-    async def test_driver_route_and_optimize_return_different_shapes(
+    async def test_driver_route_and_optimize_return_unified_shape(
         self, client, set_auth, driver_claims, db_session, mock_osrm_success
     ):
-        """Document shape difference between the two route endpoints.
+        """Both route endpoints now return the same enriched waypoint shape.
 
-        ``GET /drivers/route`` returns enriched waypoints with consumer info.
-        ``POST /routes/optimize`` returns raw waypoints.
+        ``POST /routes/optimize`` was normalized to match
+        ``GET /drivers/route``'s enriched format (Option B).
+        It also includes ``polyline`` and ``fallback_used`` as extras.
         """
         set_auth(driver_claims)
 
-        # GET /drivers/route — may be empty or 400, but we check shape if 200
-        driver_resp = await client.get("/drivers/route?pending_only=true")
-
-        # POST /routes/optimize
+        # POST /routes/optimize now returns enriched waypoints
         optimize_resp = await client.post(
             "/routes/optimize",
             json={
                 "origin_lat": 14.58,
                 "origin_lng": 121.04,
                 "stops": [
-                    {"lat": 14.5832, "lng": 121.0409, "id": "stop-1"},
+                    {"lat": 14.5832, "lng": 121.0409, "id": "stop-1",
+                     "consumer_name": "Test Consumer", "address": "123 St"},
                 ],
             },
         )
         assert optimize_resp.status_code == 200
         opt_data = optimize_resp.json()
-        # /routes/optimize returns: waypoints, total_distance_km, total_duration_min, polyline, fallback_used
+        # Enriched shape: consumer_name, address, estimated_arrival, stop, request_id
+        assert opt_data["waypoints"][0]["consumer_name"] == "Test Consumer"
+        assert opt_data["waypoints"][0]["address"] == "123 St"
+        assert "estimated_arrival" in opt_data["waypoints"][0]
+        assert "stop" in opt_data["waypoints"][0]
+        assert "request_id" in opt_data["waypoints"][0]
+        # Extra fields not present in GET /drivers/route
         assert "polyline" in opt_data
         assert "fallback_used" in opt_data
-
-        # If /drivers/route succeeded, check it returns different keys
-        if driver_resp.status_code == 200:
-            drv_data = driver_resp.json()
-            # /drivers/route returns: waypoints (enriched), total_distance_km, total_duration_min
-            # It does NOT include polyline or fallback_used
-            assert "polyline" not in drv_data
-            # Waypoints have different shape: consumer_name, address, estimated_arrival
-            if drv_data["waypoints"]:
-                wp = drv_data["waypoints"][0]
-                assert "consumer_name" in wp
-                assert "estimated_arrival" in wp
 
 
 # =============================================================================
@@ -926,13 +907,14 @@ class TestNotificationRegistration:
         assert resp.status_code == 200
         assert resp.json()["status"] == "unregistered"
 
-    async def test_unregister_from_different_profile_transfers_token(
+    async def test_unregister_from_different_profile_is_noop(
         self, client, set_auth, consumer_claims, driver_claims
     ):
-        """Profile A registers → Profile B unregisters → token deactivated.
+        """Profile A registers → Profile B unregisters same token → no-op.
 
-        This documents a cross-profile ownership gap in the unregister
-        endpoint: it looks up by push_token only, not by profile_id.
+        The unregister endpoint now filters by both push_token and
+        profile_id, so Driver B cannot deactivate Consumer A's token.
+        Returns 200 with "unregistered" (idempotent) but does nothing.
         """
         set_auth(consumer_claims)
         reg = await client.post(
@@ -944,12 +926,11 @@ class TestNotificationRegistration:
         )
         assert reg.status_code == 200
 
-        # Driver B unregisters Consumer A's token
+        # Driver B tries to unregister Consumer A's token
         set_auth(driver_claims)
         unreg = await client.put(
             "/notifications/unregister",
             json={"push_token": "ExponentPushToken[cross-profile]"},
         )
         assert unreg.status_code == 200
-        # ⚠ Security note: this succeeded even though the token belongs to
-        # Consumer A, not Driver B. No profile ownership check exists.
+        # Consumer A's token is still active (filtered by profile_id)

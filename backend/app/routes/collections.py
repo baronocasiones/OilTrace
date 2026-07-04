@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.dependencies import require_role, parse_claims_sub, Claims
 from app.models import Profile, Consumer, Driver, Owner, CollectionRequest, Collection
+from app.services.points import award_points
 from app.services.route_engine import RouteEngine
 
 router = APIRouter()
@@ -247,6 +248,15 @@ def update_request_status(id: str, payload: StatusUpdateRequest, claims: dict = 
             detail={"code": "NOT_FOUND", "message": "Request not found", "status_code": 404}
         )
         
+    # Verify the request is assigned to this driver
+    profile_id = parse_claims_sub(claims)
+    driver = db.query(Driver).filter(Driver.profile_id == profile_id).first()
+    if not driver or req.driver_id != driver.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "FORBIDDEN", "message": "This request is not assigned to you", "status_code": 403},
+        )
+        
     new_status = payload.status
     STATUS_TRANSITIONS = {
         "pending": ["assigned", "cancelled"],
@@ -297,6 +307,18 @@ def driver_collect(payload: DriverCollectRequest, claims: dict = Depends(require
     request = None
     if payload.request_id:
         req_uuid = parse_uuid(payload.request_id)
+        
+        # Idempotency: return existing collection if this request was already collected
+        existing_collection = db.query(Collection).filter(Collection.request_id == req_uuid).first()
+        if existing_collection:
+            return {
+                "collection_id": str(existing_collection.id),
+                "grade": existing_collection.oil_grade,
+                "points_awarded": 0,
+                "blockchain_tx_hash": None,
+                "blockchain_status": "not_configured",
+            }
+        
         request = db.query(CollectionRequest).filter(CollectionRequest.id == req_uuid).first()
         if not request:
             # Dynamically seed request in test mode
@@ -330,11 +352,19 @@ def driver_collect(payload: DriverCollectRequest, claims: dict = Depends(require
     db.commit()
     db.refresh(coll)
     
+    # Award points to consumer via PointsLedger
+    ledger_entry = award_points(
+        db=db,
+        consumer_id=consumer.id,
+        collection_id=coll.id,
+        volume_liters=payload.volume_liters,
+    )
+    
     # Return response per specification and test requirements
     return {
         "collection_id": str(coll.id),
         "grade": grade,
-        "points_awarded": int(payload.volume_liters * 10),
+        "points_awarded": ledger_entry.points,
         "blockchain_tx_hash": None,
         "blockchain_status": "not_configured"
     }

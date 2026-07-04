@@ -26,6 +26,8 @@ class StopInput(BaseModel):
     lat: float = Field(..., description="Stop latitude")
     lng: float = Field(..., description="Stop longitude")
     id: str = Field(..., description="Unique identifier for this stop")
+    consumer_name: str = Field("", description="Optional consumer name for enrichment")
+    address: str = Field("", description="Optional consumer address for enrichment")
 
 
 class OptimizeInput(BaseModel):
@@ -50,7 +52,7 @@ async def optimize_route(
     """Optimize a multi-stop route using OSRM.
 
     Accepts an origin and a list of stops, returns an ordered route
-    with waypoints, total distance, duration, and polyline geometry.
+    with enriched waypoints, total distance, duration, and polyline geometry.
     Falls back to haversine nearest-neighbor when OSRM is unavailable.
     """
     engine = RouteEngine()
@@ -59,4 +61,26 @@ async def optimize_route(
         origin=(body.origin_lat, body.origin_lng),
         stops=stops,
     )
-    return result
+
+    # Normalize waypoints to enriched shape matching GET /drivers/route
+    stop_map = {s["id"]: s for s in stops}
+    enriched = []
+    for wp in result["waypoints"]:
+        info = stop_map.get(wp["id"], {})
+        enriched.append({
+            "stop": wp["order"],
+            "request_id": wp["id"],
+            "consumer_name": info.get("consumer_name", ""),
+            "address": info.get("address", ""),
+            "latitude": wp["latitude"],
+            "longitude": wp["longitude"],
+            "estimated_arrival": f'{wp["eta_min"]} min',
+            "distance_from_prev": wp.get("distance_from_prev_km", 0),
+        })
+
+    return {
+        "waypoints": enriched,
+        "total_distance_km": result["total_distance_km"],
+        "total_duration_min": result["total_duration_min"],
+        "polyline": result.get("polyline", ""),
+    }

@@ -81,7 +81,7 @@ class CollectionRequest(Base):
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     consumer_id = Column(Uuid(as_uuid=True), ForeignKey("consumers.id", ondelete="CASCADE"), nullable=False)
-    driver_id = Column(Uuid(as_uuid=True), ForeignKey("drivers.id"), nullable=True)
+    driver_id = Column(Uuid(as_uuid=True), ForeignKey("drivers.id", ondelete="SET NULL"), nullable=True)
     status = Column(String(20), default="pending", nullable=False)
     request_type = Column(String(20), nullable=False)
     scheduled_date = Column(Date, nullable=True)
