@@ -22,7 +22,7 @@ cd contract && npm ci && npx hardhat test
 backend/tests/          ~115 tests across 11 files
 ├── conftest.py                  Fixtures, DB switching, auth helpers, RLS seed data
 ├── test_classification.py       Pure unit — no DB, no HTTP
-├── test_points.py               Pure unit — ledger math and expiry
+├── test_points.py               Pure unit — ledger math and redemption
 ├── test_blockchain_service.py   Service tests — mocked Web3.py + poller state machine
 ├── test_routes.py               Service tests — mocked OSRM client
 ├── test_auth_middleware.py      API tests — JWT, roles, IoT auth, rate limiting

@@ -169,7 +169,7 @@ CREATE TABLE points_ledger (
   consumer_id     UUID REFERENCES consumers(id) NOT NULL,
   collection_id   UUID REFERENCES collections(id),
   points          INT NOT NULL,           -- positive earned, negative redeemed
-  transaction_type VARCHAR(20) CHECK (transaction_type IN ('earned','redeemed','expired','bonus')),
+  transaction_type VARCHAR(20) CHECK (transaction_type IN ('earned','redeemed','bonus')),
   reference       TEXT,
   balance_after   INT NOT NULL,
   created_at      TIMESTAMPTZ DEFAULT NOW()
