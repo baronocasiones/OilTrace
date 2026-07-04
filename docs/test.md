@@ -19,7 +19,7 @@ cd contract && npm ci && npx hardhat test
 ## Test Layers
 
 ```
-backend/tests/          ~210 tests across 16 files
+backend/tests/          ~200 tests across 16 files
 ├── conftest.py                          Fixtures, DB switching, auth helpers, RLS seed data
 ├── test_classification.py               Pure unit — no DB, no HTTP
 ├── test_points.py                       Pure unit — ledger math and redemption
@@ -194,14 +194,22 @@ async def test_owner_can_assign_driver(self, client, set_auth, consumer_claims, 
 
 ### 7. RLS Seed Data
 
-The `mock_rls_session` fixture creates two consumers, one driver, and one owner in the database so RLS boundary tests can verify cross-user isolation:
+The `mock_rls_session` fixture creates two consumers, one driver, and one owner in the database so RLS boundary tests can verify cross-user isolation. Returns both Profile UUIDs (for `sub` claims) and record IDs (for FK columns):
 
 ```python
-consumer_a = Consumer(profile_id=consumer_a_id, business_name="Karinderya A")
-consumer_b = Consumer(profile_id=consumer_b_id, business_name="Karinderya B")
-driver = Driver(profile_id=driver_id, status="available")
-owner = Owner(profile_id=owner_id, company_name="OilTrace Corp")
+return {
+    "consumer_a_id": consumer_a_id,          # Profile.id (for auth claims)
+    "consumer_b_id": consumer_b_id,
+    "consumer_a_record_id": consumers[0].id,  # Consumer.id (for FK references)
+    "consumer_b_record_id": consumers[1].id,
+    "driver_id": driver_id,
+    "driver_record_id": driver_rec.id,
+    "owner_id": owner_id,
+    "owner_record_id": owner_rec.id,
+}
 ```
+
+PostgreSQL enforces FK constraints — `CollectionRequest.consumer_id` and `Collection.consumer_id` reference `Consumer.id`, not `Profile.id`. SQLite ignores this, so the distinction matters only in CI.
 
 ---
 
@@ -303,7 +311,7 @@ async def test_no_token_returns_401(self, client):
 | Edge cases | 4 | Zero address, empty geohash, duplicate record ID, zero volume |
 | Gas benchmark | 1 | Records gas cost of `recordCollection` for optimization reference |
 
-### Backend Tests — ~220 tests (114 pass / 20 skip on SQLite + ~85 PG-only integration)
+### Backend Tests — ~200 tests (114 pass / 87 skipped on SQLite; 98 pass + 2 xfailed on PG)
 
 | File | Tests | What it validates | Category |
 |------|-------|-------------------|----------|
@@ -316,11 +324,11 @@ async def test_no_token_returns_401(self, client):
 | `test_push_notifications.py` | 9 | Register/unregister device token, send on assignment/completion, malformed token → 400, rate limiting (burst of 20), notification audit log for owner | API |
 | `test_partners.py` | 8 | Create/list partners (owner-only), voucher code format (`OIL-XXXXXXXX`), QR data format (`oiltrace://voucher/...`), expiry display, settlement amount math | API |
 | `test_realtime.py` | 10 | Channel authorization (owner all, driver own only, consumer none), location payload format, rate limiting (5s throttle), driver offline status, disconnect handling, broadcast to nonexistent channel | API |
-| `test_rls_boundaries.py` | 9 | Consumer A can't see Consumer B's requests, driver sees only their assigned requests, owner sees all, unauthenticated → empty, public blockchain records accessible without auth, own profile always readable (PostgreSQL only) | API (PG) |
+| `test_rls_boundaries.py` | 9 | Consumer isolation (requests, collections, by-ID access), driver isolation (assigned-only, earnings, consumer list), owner bypass (all collections, driver locations), unauthenticated block | API (PG) |
 | `test_integration_workflows.py` | ~36 | See "Integration Tests" section below | Integration (PG) |
 | `test_integration_data_integrity.py` | ~22 | See "Integration Tests" section below | Integration (PG) |
 | `test_integration_rate_limiting.py` | ~8 | See "Integration Tests" section below | Integration (PG) |
-| `test_integration_concurrency.py` | ~18 | See "Integration Tests" section below | Integration (PG) |
+| `test_integration_concurrency.py` | ~18 | See "Integration Tests" section below; 2 xfailed (asyncpg session sharing) | Integration (PG) |
 | `test_integration_error_recovery.py` | ~18 | See "Integration Tests" section below | Integration (PG) |
 
 ---
@@ -355,22 +363,22 @@ backend/tests/          +5 files, ~95 tests
 
 | File | Classes | ~Tests | What it validates |
 |------|---------|--------|-------------------|
-| `test_integration_workflows.py` | 6 | 36 | Consumer create → owner assign → driver collect → points → redeem; ad-hoc collect; driver route; notification register/unregister |
+| `test_integration_workflows.py` | 6 | 36 | Consumer create → owner assign → driver collect → points → redeem; ad-hoc collect; driver route (origin fallback, 400 when no location); route optimize (enriched waypoints, polyline, `fallback_used`); notification register/unregister |
 | `test_integration_data_integrity.py` | 5 | 22 | FK cascade on driver delete, CHECK constraints (TPM 0-30, volume > 0, points > 0), PushDevice unique token, PointsLedger balance consistency, parse_uuid fallback behavior |
-| `test_integration_rate_limiting.py` | 3 | 8 | 30 req/min budget on `POST /routes/optimize`, 429 response structure, 100/min global limit, health endpoint exempt, rate limit headers |
-| `test_integration_concurrency.py` | 4 | 15-18 | Two drivers collect same request (both succeed — no dedup), concurrent collections diff consumers, concurrent 60-point redemptions from 100 balance (no double-spend guard), duplicate status transitions, Driver B updating Driver A's request (ownership gap documented), duplicate consumer requests create distinct records, duplicate collection same request_id, duplicate push token changes owner |
-| `test_integration_error_recovery.py` | 4 | 14-18 | OSRM fallback to nearest-neighbor (waypoints without polyline), push failure logged not raised, wrong role → 403 (parametrized), nonexistent endpoint → 404, malformed JSON → 422, missing auth → 401, invalid UUID → 422, dead code existence checks (BlockchainService, award_points, PushService) |
+| `test_integration_rate_limiting.py` | 3 | 8 | 30 req/min budget on `POST /routes/optimize`, 429 response structure (uses `error` key, not `detail`), 100/min global limit, health endpoint exempt, rate limit headers. Note: two `Limiter` instances exist — middleware (`app.state.limiter`) and decorator wrapper on the endpoint (`_limiter` in routes.py). Both must be toggled to disable. |
+| `test_integration_concurrency.py` | 4 | 15-18 (2 xfailed) | Two drivers collect same request (both succeed — no dedup), concurrent collections diff consumers, concurrent 60-point redemptions from 100 balance (no double-spend guard), duplicate status transitions, Driver B updating Driver A's request (ownership gap documented), duplicate consumer requests create distinct records, duplicate collection same request_id, duplicate push token changes owner. Two tests xfailed: `test_two_drivers_collect_same_request_id` and `test_concurrent_collections_different_consumers` — `asyncio.gather` shares one `db_session` which asyncpg rejects on concurrent `commit()`. |
+| `test_integration_error_recovery.py` | 4 | 14-18 | OSRM fallback to nearest-neighbor (polyline present in success, waypoints key is `request_id`), push failure logged not raised, wrong role → 403 (parametrized), nonexistent endpoint → 404, malformed JSON → 422, missing auth → 401, invalid UUID → 422, dead code existence checks (BlockchainService, award_points, PushService) |
 
 ### Known Bugs and Security Gaps Found
 
-| Bug | File | Impact |
-|-----|------|--------|
-| `driver_collect()` returns `points_awarded` but never calls `award_points()` or inserts into `PointsLedger` | `collections.py` line 337 | Consumer points are never persisted |
-| `PUT /drivers/requests/{id}/status` lacks `req.driver_id == driver.id` ownership check | `collections.py` line 239 | Any driver can update any request's status |
-| `CollectionRequest.driver_id` FK has no `ondelete` rule | `models.py` line 84 | Deleting a driver leaves orphan references |
-| `BlockchainService` and `award_points()` exist but are never called from any route | `services/blockchain.py`, `services/points.py` | Dead code — no blockchain recording at all |
-| `PUT /notifications/unregister` deactivates by `push_token` alone, no `profile_id` check | `notifications.py` | Cross-profile deactivation possible |
-| `POST /drivers/collect` has no idempotency guard on `request_id` | `collections.py` | Same request can be collected multiple times |
+| Bug | File | Impact | Status |
+|-----|------|--------|--------|
+| `BlockchainService` exists but is never called from any route | `services/blockchain.py` | Dead code — no blockchain recording at all | Still open |
+| `POST /drivers/collect` has no idempotency guard on `request_id` | `collections.py` | Same request can be collected multiple times | Still open |
+| `driver_collect()` returns `points_awarded` but never called `award_points()` | `collections.py` | Consumer points were never persisted | **Fixed** — now calls `award_points()` at line 356 |
+| `CollectionRequest.driver_id` FK had no `ondelete` rule | `models.py` | Deleting a driver left orphan references | **Fixed** — now `ondelete="SET NULL"` |
+| `PUT /drivers/requests/{id}/status` lacked `req.driver_id == driver.id` ownership check | `collections.py` | Any driver could update any request | **Fixed** — ownership guard added at line 254 |
+| `PUT /notifications/unregister` lacked `profile_id` filter | `notifications.py` | Cross-profile deactivation possible | **Fixed** — now filters by both `push_token` and `profile_id` |
 
 ---
 
@@ -401,16 +409,19 @@ Caches `node_modules` via npm.
 
 ### `.github/workflows/backend.yml`
 
-| Trigger | Job | Timeout |
-|---------|-----|---------|
-| Any push touching `backend/**` (any branch) | `pytest tests/ -v` (Python 3.11) | 10 min |
-| PR to `main` touching `backend/**` | Same | 10 min |
+| Trigger | Jobs | Timeout |
+|---------|------|---------|
+| Any push touching `backend/**` (any branch) | **Unit & API tests (SQLite)** + **Integration tests (PostgreSQL)** | 10 min each |
+| PR to `main` touching `backend/**` | Same | 10 min each |
 
-Runs all backend tests in SQLite mode. RLS boundary tests run only if `OILTRACE_TEST_DB=postgres` is set. Caches pip packages.
+Two jobs run in parallel:
 
-### What doesn't fire CI
+1. **Unit & API tests (SQLite)** — `pytest tests/ -v` ignoring all 6 RLS/integration files. Fast (~30s CI), no external deps.
+2. **Integration tests (PostgreSQL)** — runs against a `postgres:16-alpine` service container with `-k "rls_boundaries or integration"`. Tests RLS isolation, full workflows, data integrity, rate limiting, concurrency, and error recovery. Uses `psycopg2-binary`.
 
-Pushing changes to `docs/`, `hardware/`, `mobile/`, root `.md` files, or anything outside `backend/` and `contract/` — **no CI runs**. Clean green checks across the board.
+Caches pip packages via `actions/setup-python@v5`.
+
+Note: Changes to `docs/`, `mobile/`, `hardware/`, or root `.md` files do **not** trigger any CI.
 
 ---
 
@@ -454,3 +465,5 @@ async def test_requires_auth(self, client):
 - **Route engine unit tests use mocked OSRM responses** (`_fetch_osrm` monkeypatched); API tests hit the real `POST /routes/optimize` endpoint which calls OSRM or falls back to haversine
 - **Async tests** use `pytest-asyncio` — test functions must be `async def` or they won't await properly
 - **Supabase Auth** is not tested at the unit level — JWT verification is replaced by `dependency_overrides` in test mode; full auth flow requires Supabase local dev or staging
+- **Two concurrent collection tests are `xfail`'d** — `test_two_drivers_collect_same_request_id` and `test_concurrent_collections_different_consumers` use `asyncio.gather` with a shared `db_session`; asyncpg rejects concurrent `commit()` with `IllegalStateChangeError`. They pass with SQLite. Fix requires per-task sessions.
+- **Rate limiter uses two `Limiter` instances** — `app.state.limiter` (middleware) and `routes._limiter` (decorator wrapper). Tests that disable rate limiting must toggle both. The decorator's `async_wrapper` checks limits *inside* the endpoint, independently of the middleware.
