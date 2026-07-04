@@ -5,7 +5,7 @@ Used cooking oil collection for Philippine karinderyas. IoT sensor grades oil fo
 ## Repo at a glance
 
 ```
-backend/    # FastAPI + pytest (120 tests, 89 pass, 20 pre-existing failures)
+backend/    # FastAPI + pytest (115 tests, 104 pass, 0 pre-existing failures)
 contract/   # Solidity 0.8.20 + Hardhat (~20 tests)
 mobile/     # React Native + Expo (EMPTY — not started)
 hardware/   # ESP32 PlatformIO (EMPTY — not started)
