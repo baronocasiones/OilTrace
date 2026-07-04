@@ -28,9 +28,27 @@ from app.dependencies import Claims
 
 # ── Conditional PostgreSQL / SQLite ─────────────────────────────────
 
-USE_REAL_PG = os.environ.get("OILTRACE_TEST_DB", "").lower() in ("postgres", "pg")
+EXPLICIT_DB_URL = os.environ.get("DATABASE_URL")
 
-if USE_REAL_PG:
+# USE_REAL_PG controls the needs_postgres skip marker.
+# True if: env var says postgres, OR DATABASE_URL points to postgresql://
+USE_REAL_PG = (
+    os.environ.get("OILTRACE_TEST_DB", "").lower() in ("postgres", "pg")
+    or (EXPLICIT_DB_URL or "").startswith("postgresql://")
+)
+
+# Determine database URL strategy:
+# 1. If DATABASE_URL is set explicitly, use it (CI service container / manual)
+# 2. If USE_REAL_PG and testcontainers available, spin up a container
+# 3. Otherwise, fall back to SQLite
+
+if EXPLICIT_DB_URL:
+    # Use whatever was provided (CI service container, local PG, etc.)
+    @pytest.fixture
+    def db_url() -> str:
+        return EXPLICIT_DB_URL
+
+elif USE_REAL_PG:
     try:
         from testcontainers.postgres import PostgresContainer
 
@@ -51,7 +69,7 @@ if USE_REAL_PG:
               "pip install testcontainers[postgresql] psycopg2-binary")
 
 
-if not USE_REAL_PG:
+if not EXPLICIT_DB_URL and not USE_REAL_PG:
     # Fallback to SQLite for basic unit tests
     TEST_DATABASE_URL = "sqlite:///./test.db"
 
