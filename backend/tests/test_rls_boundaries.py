@@ -30,7 +30,7 @@ class TestConsumerIsolation:
 
         # Seed a request for Consumer B using db_session (mock_rls_session is a dict)
         req = CollectionRequest(
-            consumer_id=mock_rls_session["consumer_b_id"],
+            consumer_id=mock_rls_session["consumer_b_record_id"],
             status="pending",
             request_type="on_demand",
         )
@@ -57,10 +57,11 @@ class TestConsumerIsolation:
         # Seed a collection for Consumer B
         from app.models import Collection
         db_session.add(Collection(
-            consumer_id=mock_rls_session["consumer_b_id"],
-            driver_id=mock_rls_session["driver_id"],
+            consumer_id=mock_rls_session["consumer_b_record_id"],
+            driver_id=mock_rls_session["driver_record_id"],
             tpm_value=24.5,
             oil_grade="standard",
+            oil_destination="blended",
             volume_liters=5.0
         ))
         db_session.commit()
@@ -87,7 +88,7 @@ class TestConsumerIsolation:
 
         # Seed a request for Consumer B
         req = CollectionRequest(
-            consumer_id=mock_rls_session["consumer_b_id"],
+            consumer_id=mock_rls_session["consumer_b_record_id"],
             status="pending",
             request_type="on_demand",
         )
@@ -118,18 +119,18 @@ class TestDriverIsolation:
 
         # Create a request assigned to the driver and add a collection for it
         req = CollectionRequest(
-            consumer_id=mock_rls_session["consumer_a_id"],
+            consumer_id=mock_rls_session["consumer_a_record_id"],
             status="completed",
             request_type="on_demand",
-            driver_id=mock_rls_session["driver_id"],
+            driver_id=mock_rls_session["driver_record_id"],
         )
         db_session.add(req)
         db_session.commit()
 
         coll = Collection(
             request_id=req.id,
-            consumer_id=mock_rls_session["consumer_a_id"],
-            driver_id=mock_rls_session["driver_id"],
+            consumer_id=mock_rls_session["consumer_a_record_id"],
+            driver_id=mock_rls_session["driver_record_id"],
             tpm_value=20.0,
             oil_grade="standard",
             oil_destination="blended",
@@ -171,8 +172,8 @@ class TestDriverIsolation:
 
         # Create a collection to ensure the driver has data
         db_session.add(Collection(
-            consumer_id=mock_rls_session["consumer_a_id"],
-            driver_id=mock_rls_session["driver_id"],
+            consumer_id=mock_rls_session["consumer_a_record_id"],
+            driver_id=mock_rls_session["driver_record_id"],
             tpm_value=20.0, oil_grade="standard", oil_destination="blended",
             volume_liters=5.0,
         ))
@@ -201,14 +202,14 @@ class TestOwnerBypass:
         from app.models import Collection
         db_session.add_all([
             Collection(
-                consumer_id=mock_rls_session["consumer_a_id"],
-                driver_id=mock_rls_session["driver_id"],
+                consumer_id=mock_rls_session["consumer_a_record_id"],
+                driver_id=mock_rls_session["driver_record_id"],
                 tpm_value=18.0, oil_grade="premium", oil_destination="SAF",
                 volume_liters=5.0
             ),
             Collection(
-                consumer_id=mock_rls_session["consumer_b_id"],
-                driver_id=mock_rls_session["driver_id"],
+                consumer_id=mock_rls_session["consumer_b_record_id"],
+                driver_id=mock_rls_session["driver_record_id"],
                 tpm_value=30.0, oil_grade="low", oil_destination="biofuel",
                 volume_liters=5.0
             ),

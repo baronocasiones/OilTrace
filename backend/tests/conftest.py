@@ -504,14 +504,20 @@ def mock_rls_session(db_session: Session):
     for c in consumers:
         db_session.add(c)
 
-    db_session.add(Driver(profile_id=driver_id, status="available"))
-    db_session.add(Owner(profile_id=owner_id, company_name="OilTrace Corp"))
+    driver_rec = Driver(profile_id=driver_id, status="available")
+    owner_rec = Owner(profile_id=owner_id, company_name="OilTrace Corp")
+    db_session.add(driver_rec)
+    db_session.add(owner_rec)
 
     db_session.commit()
 
     return {
         "consumer_a_id": consumer_a_id,
         "consumer_b_id": consumer_b_id,
+        "consumer_a_record_id": consumers[0].id,
+        "consumer_b_record_id": consumers[1].id,
         "driver_id": driver_id,
+        "driver_record_id": driver_rec.id,
         "owner_id": owner_id,
+        "owner_record_id": owner_rec.id,
     }

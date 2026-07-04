@@ -783,36 +783,40 @@ class TestDriverRouteWorkflow:
         It also includes ``polyline`` and ``fallback_used`` as extras.
         """
         from app.main import app
-        # Reset rate limiter storage so previous tests don't exhaust the budget
+        from app.routes.routes import _limiter as route_limiter
+        # Disable both limiters — the middleware limiter (app.state) AND the
+        # decorator's own limiter on the endpoint wrapper.
+        app.state.limiter.enabled = False
+        route_limiter.enabled = False
         try:
-            app.state.limiter._limiter.storage.reset()
-        except Exception:
-            pass
-        set_auth(driver_claims)
+            set_auth(driver_claims)
 
-        # POST /routes/optimize now returns enriched waypoints
-        optimize_resp = await client.post(
-            "/routes/optimize",
-            json={
-                "origin_lat": 14.58,
-                "origin_lng": 121.04,
-                "stops": [
-                    {"lat": 14.5832, "lng": 121.0409, "id": "stop-1",
-                     "consumer_name": "Test Consumer", "address": "123 St"},
-                ],
-            },
-        )
-        assert optimize_resp.status_code == 200
-        opt_data = optimize_resp.json()
-        # Enriched shape: consumer_name, address, estimated_arrival, stop, request_id
-        assert opt_data["waypoints"][0]["consumer_name"] == "Test Consumer"
-        assert opt_data["waypoints"][0]["address"] == "123 St"
-        assert "estimated_arrival" in opt_data["waypoints"][0]
-        assert "stop" in opt_data["waypoints"][0]
-        assert "request_id" in opt_data["waypoints"][0]
-        # Extra fields not present in GET /drivers/route
-        assert "polyline" in opt_data
-        assert "fallback_used" in opt_data
+            # POST /routes/optimize now returns enriched waypoints
+            optimize_resp = await client.post(
+                "/routes/optimize",
+                json={
+                    "origin_lat": 14.58,
+                    "origin_lng": 121.04,
+                    "stops": [
+                        {"lat": 14.5832, "lng": 121.0409, "id": "stop-1",
+                         "consumer_name": "Test Consumer", "address": "123 St"},
+                    ],
+                },
+            )
+            assert optimize_resp.status_code == 200
+            opt_data = optimize_resp.json()
+            # Enriched shape: consumer_name, address, estimated_arrival, stop, request_id
+            assert opt_data["waypoints"][0]["consumer_name"] == "Test Consumer"
+            assert opt_data["waypoints"][0]["address"] == "123 St"
+            assert "estimated_arrival" in opt_data["waypoints"][0]
+            assert "stop" in opt_data["waypoints"][0]
+            assert "request_id" in opt_data["waypoints"][0]
+            # Extra fields not present in GET /drivers/route
+            assert "polyline" in opt_data
+            assert "fallback_used" in opt_data
+        finally:
+            app.state.limiter.enabled = True
+            route_limiter.enabled = True
 
 
 # =============================================================================
