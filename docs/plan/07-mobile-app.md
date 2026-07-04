@@ -284,8 +284,7 @@ On logout → PUT /api/v1/notifications/unregister
 |-------|-----------|-------|------|
 | New collection request | Driver pool | "New pickup!" | "Aling Maria's — 5L — 2km away" |
 | Request assigned | Driver | "Assigned!" | "You're assigned to collect from Aling Maria's" |
-| Collection completed | Consumer | "Oil collected! 🎉" | "5L collected. You earned 50 points!" |
-| Points about to expire | Consumer | "Points expiring!" | "Your 50 points expire in 3 days" |
+| Collection completed | Consumer | "Oil collected!" | "5L collected. You earned 50 points!" |
 
 ## Tech Stack
 

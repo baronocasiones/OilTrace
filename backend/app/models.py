@@ -182,8 +182,26 @@ class PointsLedger(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
-        CheckConstraint("transaction_type IN ('earned', 'redeemed', 'expired', 'bonus')", name="check_points_transaction_type"),
+        CheckConstraint("transaction_type IN ('earned', 'redeemed', 'bonus')", name="check_points_transaction_type"),
     )
 
     consumer = relationship("Consumer", back_populates="ledger_entries")
     collection = relationship("Collection")
+
+
+class PushDevice(Base):
+    __tablename__ = "device_tokens"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    profile_id = Column(Uuid(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False)
+    platform = Column(String(10), nullable=False)
+    push_token = Column(String, unique=True, nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        CheckConstraint("platform IN ('ios', 'android')", name="check_device_platform"),
+    )
+
+    profile = relationship("Profile")

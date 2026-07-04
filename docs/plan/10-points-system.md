@@ -43,7 +43,6 @@ Consumer gives 5L used oil
 | Points per liter | **10 pts/L** | Configurable by owner |
 | Discount value per point | **₱0.50-1.00/pt** | Determined per partner |
 | Minimum redemption | **10 pts** (₱5-10 discount) | Low barrier for engagement |
-| Point expiry | **90 days** | Encourages regular engagement |
 
 ### Sample Economics (Owner Config Screen)
 
@@ -52,8 +51,7 @@ Consumer gives 5L used oil
   "points_per_liter": 10,
   "default_discount_per_point": 0.50,
   "new_user_bonus_points": 50,
-  "referral_points": 25,
-  "expiry_days": 90
+  "referral_points": 25
 }
 ```
 

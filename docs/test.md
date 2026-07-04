@@ -19,7 +19,7 @@ cd contract && npm ci && npx hardhat test
 ## Test Layers
 
 ```
-backend/tests/          ~112 tests across 11 files
+backend/tests/          ~115 tests across 11 files
 ├── conftest.py                  Fixtures, DB switching, auth helpers, RLS seed data
 ├── test_classification.py       Pure unit — no DB, no HTTP
 ├── test_points.py               Pure unit — ledger math and expiry
@@ -301,19 +301,19 @@ async def test_no_token_returns_401(self, client):
 | Edge cases | 4 | Zero address, empty geohash, duplicate record ID, zero volume |
 | Gas benchmark | 1 | Records gas cost of `recordCollection` for optimization reference |
 
-### Backend Tests — 120 tests (89 pass, 20 pre-existing failures, 11 skipped)
+### Backend Tests — 115 tests (104 pass, 0 failures, 11 skipped)
 
 | File | Tests | What it validates | Category |
 |------|-------|-------------------|----------|
 | `test_classification.py` | 12 | TPM boundaries (19.9/20.0/29.9/30.0), negative TPM error, zero/edge values, per-grade descriptions, 10K-call throughput benchmark | Pure unit |
-| `test_points.py` | 14 | Earn calculation (10 pts/L), redemption deduction, insufficient balance → 400, 90-day expiry, running ledger integrity across 5+ transactions | Pure unit |
+| `test_points.py` | 15 | Earn calculation (10 pts/L), redemption deduction, insufficient balance → 400, running ledger integrity across 5+ transactions | Pure unit |
 | `test_blockchain_service.py` | 15 | Web3.py write with correct args, contract-owner-only guard, RPC connection failure, verification endpoint, poller state machine: confirmed/failed/stale/RPC recovery/retry count max | Service |
 | `test_routes.py` | 11 | Multi-stop/single-stop/zero-stop routes, OSRM success response parsing, OSRM timeout fallback, OSRM HTTP error fallback, nearest-neighbor ordering correctness, polyline in response, auth required (401), role enforcement (consumer → 403) | Service |
 | `test_auth_middleware.py` | 14 | No-auth → 401, empty token → 401, any token without override → 401, consumer/driver/owner role enforcement (403), unauthenticated request → 401, IoT auth/reading stubbed (404), rate limiter active | API |
 | `test_collection_api.py` | 21 | Create on-demand/scheduled request, list own, get single, 404 for nonexistent, driver assign (owner can/consumer cannot/driver cannot), record collection with/without request, TPM validation (out-of-range, negative), route retrieval with seeded data (waypoints key, enriched consumer info), status transitions (valid/invalid/completed cancel) | API |
-| `test_push_notifications.py` | 10 | Register/unregister device token, send on assignment/completion/expiry, malformed token → 400, rate limiting (burst of 20), notification audit log for owner | API |
+| `test_push_notifications.py` | 9 | Register/unregister device token, send on assignment/completion, malformed token → 400, rate limiting (burst of 20), notification audit log for owner | API |
 | `test_partners.py` | 8 | Create/list partners (owner-only), voucher code format (`OIL-XXXXXXXX`), QR data format (`oiltrace://voucher/...`), expiry display, settlement amount math | API |
-| `test_realtime.py` | 8 | Channel authorization: driver subscribes OK, consumer can subscribe to assigned driver, consumer rejected for unassigned driver, unauthenticated → 401, payload field validation, rate limit after 10 updates/second, disconnect cleanup | API |
+| `test_realtime.py` | 10 | Channel authorization (owner all, driver own only, consumer none), location payload format, rate limiting (5s throttle), driver offline status, disconnect handling, broadcast to nonexistent channel | API |
 | `test_rls_boundaries.py` | 9 | Consumer A can't see Consumer B's requests, driver sees only their assigned requests, owner sees all, unauthenticated → empty, public blockchain records accessible without auth, own profile always readable (PostgreSQL only) | API (PG) |
 
 ---

@@ -118,25 +118,6 @@ class TestSendNotifications:
         )
         assert result["status"] == "ok"
 
-    async def test_send_notification_on_points_expiry(self, monkeypatch):
-        """Reminding consumers about expiring points."""
-        from app.services.push_notifications import PushService
-
-        mock_send = AsyncMock(return_value={"status": "ok"})
-        monkeypatch.setattr(
-            "app.services.push_notifications.PushService.send_push",
-            mock_send
-        )
-
-        service = PushService()
-        result = await service.notify_points_expiring(
-            consumer_push_token="ExponentPushToken[consumer-token]",
-            expiring_points=50,
-            expiry_days=3
-        )
-        assert result["status"] == "ok"
-
-
 class TestNotificationErrorHandling:
     """Handling failures in the push delivery pipeline."""
 

@@ -2,11 +2,11 @@
 Tests for the points ledger and voucher system.
 
 Covers: earn calculation, redemption deduction, insufficient balance,
-running balance integrity, point expiry.
+running balance integrity.
 """
 
 import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from unittest.mock import patch, MagicMock
 
 
@@ -167,41 +167,3 @@ class TestPointsLedger:
         with pytest.raises(InsufficientPointsError):
             ledger.withdraw(100)
 
-
-class TestPointExpiry:
-    """90-day expiry logic."""
-
-    def test_points_expire_after_90_days(self):
-        """Points earned on day 0 expire on day 91."""
-        from app.services.points import PointsLedger, is_expired
-
-        earned_date = datetime.now(timezone.utc) - timedelta(days=91)
-        assert is_expired(earned_date) is True
-
-    def test_points_not_expired_before_90_days(self):
-        """Points earned 89 days ago are still valid."""
-        from app.services.points import is_expired
-
-        earned_date = datetime.now(timezone.utc) - timedelta(days=89)
-        assert is_expired(earned_date) is False
-
-    def test_expiry_at_exactly_90_days(self):
-        """Points earned exactly 90 days ago are still valid (edge case)."""
-        from app.services.points import is_expired
-
-        earned_date = datetime.now(timezone.utc) - timedelta(days=90)
-        assert is_expired(earned_date) is False
-
-    def test_expired_points_deducted_from_balance(self):
-        """Expired points are removed from balance on expiry check."""
-        from app.services.points import PointsLedger
-
-        ledger = PointsLedger()
-        # Deposit points in the past
-        old_date = datetime.now(timezone.utc) - timedelta(days=100)
-        ledger.deposit(100, earned_at=old_date)
-        ledger.deposit(50)  # Fresh points
-
-        expired = ledger.apply_expiry()
-        assert expired == 100
-        assert ledger.balance == 50

@@ -1,6 +1,6 @@
 import uuid
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -29,18 +29,6 @@ def calculate_points_earned(volume_liters: float) -> int:
     return calculate_earned_points(volume_liters, 10)
 
 
-def is_expired(earned_date: datetime) -> bool:
-    """Points expire after 90 days.
-
-    Points earned exactly 90 days ago are still valid.
-    Points earned 91 days ago (or more) are expired.
-    """
-    if earned_date.tzinfo is None:
-        earned_date = earned_date.replace(tzinfo=timezone.utc)
-    now = datetime.now(timezone.utc)
-    return (now - earned_date) > timedelta(days=90, seconds=2)
-
-
 class MockVoucher:
     """Mock voucher class used in pure-logic (DB-less) unit tests."""
     def __init__(self, voucher_code: str, discount_amount: float):
@@ -51,7 +39,7 @@ class MockVoucher:
 class PointsLedger:
     """In-memory points ledger used for unit testing.
 
-    Manages balances, transaction history, and FIFO expiry tracking.
+    Manages balances, transaction history, and FIFO consumption tracking.
     """
     def __init__(self):
         self.balance = 0
@@ -94,28 +82,12 @@ class PointsLedger:
         for dep in self.deposits:
             if to_consume <= 0:
                 break
-            if is_expired(dep["earned_at"]) or dep["remaining"] <= 0:
+            if dep["remaining"] <= 0:
                 continue
 
             consume_amt = min(dep["remaining"], to_consume)
             dep["remaining"] -= consume_amt
             to_consume -= consume_amt
-
-    def apply_expiry(self) -> int:
-        expired_total = 0
-        for dep in self.deposits:
-            if dep["remaining"] > 0 and is_expired(dep["earned_at"]):
-                expired_total += dep["remaining"]
-                dep["remaining"] = 0
-
-        if expired_total > 0:
-            self.balance -= expired_total
-            self.transactions.append({
-                "points": -expired_total,
-                "created_at": datetime.now(timezone.utc)
-            })
-        return expired_total
-
 
 def redeem_points(
     consumer_id: str,
