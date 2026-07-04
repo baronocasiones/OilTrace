@@ -83,4 +83,5 @@ async def optimize_route(
         "total_distance_km": result["total_distance_km"],
         "total_duration_min": result["total_duration_min"],
         "polyline": result.get("polyline", ""),
+        "fallback_used": result.get("fallback_used", False),
     }
