@@ -99,11 +99,13 @@ For detailed points system mechanics (database schema, API, settlement flow), se
 
 ### Points Tiers (For Team Decision)
 
-| Tier | Points per Liter | Discount at Partner | Value to Karinderya |
-|------|-----------------|--------------------|--------------------|
-| **Conservative** | 10 pts/L | 5% off (e.g., ₱25 on ₱500) | ~₱5/L equivalent |
-| **Competitive** | 20 pts/L | 10% off (e.g., ₱50 on ₱500) | ~₱10/L equivalent |
-| **Aggressive** | 30 pts/L | 15% off (e.g., ₱75 on ₱500) | ~₱15/L equivalent |
+| Tier | Points per Liter | Discount at Partner | Value to Karinderya | Partner Likely to Accept? |
+|------|-----------------|--------------------|--------------------|--------------------------|
+| **Conservative** | 10 pts/L | 5% off (e.g., ₱25 on ₱500) | ~₱5/L equivalent | ✅ Yes, easily |
+| **Recommended → 🏆** | **20 pts/L** | **10% off (e.g., ₱50 on ₱500)** | **~₱10/L equivalent** | **✅ Yes — standard promo rate** |
+| **Aggressive** | 30 pts/L | 15% off (e.g., ₱75 on ₱500) | ~₱15/L equivalent | ⚠️ Some partners will, some won't |
+
+**Recommendation:** Start at **20 pts/L (10% off)**. It's a standard retail promo that partners already budget for, and combined with scheduled pickup + legitimacy, it's attractive enough to win karinderyas over. If adoption is slow in high-volume corridors, bump to 30 pts/L — OilTrace's profit is the same either way since partners fund the discount.
 
 **Why points instead of cash?**
 
@@ -329,7 +331,7 @@ Start with **gig model** (Option A) for pilot phase. Drivers are hired per route
 
 | Question | Options |
 |----------|---------|
-| **Points tier** | Conservative (10 pts/L) / Competitive (20 pts/L) / Aggressive (30 pts/L) |
+| **Points tier** | Recommended: 20 pts/L (10% off) / Conservative: 10 pts/L / Aggressive: 30 pts/L |
 | **Monetization model** | Fixed margin (₱5/L) / Percentage (15%) / Subscription + volume fee |
 | **Driver model** | Gig / Salary + bonus / Phased |
 | **First buyer to approach** | Chemrez / RMC / Kobkiat / All in parallel |
