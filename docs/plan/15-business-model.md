@@ -103,11 +103,11 @@ For detailed points system mechanics (database schema, API, settlement flow), se
 
 | Tier | Points per Liter | Discount at Partner | Value to Karinderya | Partner Likely to Accept? |
 |------|-----------------|--------------------|--------------------|--------------------------|
-| **Conservative** | 10 pts/L | 5% off (e.g., ₱25 on ₱500) | ~₱5/L equivalent | ✅ Yes, easily |
-| **Recommended → 🏆** | **20 pts/L** | **10% off (e.g., ₱50 on ₱500)** | **~₱10/L equivalent** | **✅ Yes — standard promo rate** |
-| **Aggressive** | 30 pts/L | 15% off (e.g., ₱75 on ₱500) | ~₱15/L equivalent | ⚠️ Some partners will, some won't |
+| Conservative | 10 pts/L | 5% off (e.g., ₱25 on ₱500) | ~₱5/L equivalent | ✅ Yes, easily |
+| **✅ Chosen** | **20 pts/L** | **10% off (e.g., ₱50 on ₱500)** | **~₱10/L equivalent** | **✅ Yes — standard promo rate** |
+| Aggressive | 30 pts/L | 15% off (e.g., ₱75 on ₱500) | ~₱15/L equivalent | ⚠️ Some partners will, some won't |
 
-**Recommendation:** Start at **20 pts/L (10% off)**. It's a standard retail promo that partners already budget for, and combined with scheduled pickup + legitimacy, it's attractive enough to win karinderyas over. If adoption is slow in high-volume corridors, bump to 30 pts/L — OilTrace's profit is the same either way since partners fund the discount.
+**✅ Decision (Jul 2026):** 20 pts/L (10% off). Standard retail promo that partners already budget for. If adoption is slow in high-volume corridors, bump to 30 pts/L — OilTrace's profit is the same either way since partners fund the discount.
 
 **Why points instead of cash?**
 
@@ -333,13 +333,13 @@ Salary + bonus provides predictable service quality and driver retention from th
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| **Monetization model** | **Percentage margin (15%)** | Scales with oil prices, aligns incentives with buyers. Team decision — Jul 2026. |
-| **Driver model** | **Salary + bonus (Option B)** | Predictable service quality and driver retention. Daily base + per-liter bonus. Team decision — Jul 2026. |
+| **Monetization model** | **Percentage margin (15%)** | Scales with oil prices, aligns incentives with buyers. |
+| **Driver model** | **Salary + bonus (Option B)** | Predictable service quality and driver retention. Daily base + per-liter bonus. |
+| **Points tier** | **20 pts/L (10% off)** | Standard retail promo rate partners already budget for. Bump to 30 if adoption is slow. |
+| **Buyer approach** | **All in parallel** | Approach Chemrez, RMC, and Kobkiat simultaneously. Maximizes options and leverage. |
 
 ## Open Questions (For Team Discussion)
 
 | Question | Options |
 |----------|---------|
-| **Points tier** | Recommended: 20 pts/L (10% off) / Conservative: 10 pts/L / Aggressive: 30 pts/L |
-| **First buyer to approach** | Chemrez / RMC / Kobkiat / All in parallel |
 | **Backup plan (no partner funding)** | Conservative (A+B+C) / Strong (A+B+C+D) / A+B+E / A+E+F / C+D+F / Ultimate (all levers) |
