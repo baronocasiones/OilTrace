@@ -45,7 +45,7 @@ Karinderyas (3-10L each)
 
 OilTrace earns by selling aggregated, sensor-graded, blockchain-verified UCO to industrial buyers. Three models are documented below for team discussion.
 
-### Model A: Fixed Margin per Liter (Recommended)
+### Model A: Fixed Margin per Liter
 
 OilTrace negotiates prices with buyers, keeps a fixed margin per liter, and passes the rest to operations.
 
@@ -61,7 +61,7 @@ OilTrace negotiates prices with buyers, keeps a fixed margin per liter, and pass
 **Pros:** Simple to communicate, predictable margins, easy to negotiate with buyers.
 **Cons:** Fixed margin doesn't scale with oil price increases.
 
-### Model B: Percentage Margin
+### Model B: Percentage Margin ✅ (Team Decision)
 
 OilTrace keeps a fixed percentage (e.g., 15%) of the sale price.
 
@@ -75,6 +75,8 @@ OilTrace keeps a fixed percentage (e.g., 15%) of the sale price.
 
 **Pros:** Scales with oil prices, aligned incentives with buyer.
 **Cons:** Less predictable, harder to explain.
+
+**✅ Decision (Jul 2026):** Team selected this model. The 15% margin scales naturally with oil prices and aligns OilTrace's incentives with buyers.
 
 ### Model C: Subscription + Volume Fee
 
@@ -227,7 +229,7 @@ If a mid-size restaurant along a collection route is not already served by a com
 
 ## Driver Model
 
-Two options documented for team decision.
+**✅ Decision (Jul 2026):** Team selected **Option B — Salary + Bonus**.
 
 ### Option A: Gig / Commission-Based
 
@@ -249,9 +251,9 @@ Two options documented for team decision.
 | Ebike provided by | OilTrace |
 | Best for | Service quality, retention, accountability |
 
-### Recommendation
+### Rationale
 
-Start with **gig model** (Option A) for pilot phase. Drivers are hired per route, no long-term commitment. Once routes are proven and consistent volume is established, transition proven drivers to **salary + bonus** for quality control.
+Salary + bonus provides predictable service quality and driver retention from the start. The daily base (₱500-800) covers QC living costs, while the per-liter bonus (₱1-2/L) incentivizes thorough collection and route efficiency. This model is better suited for building long-term karinderya relationships compared to gig-based routes.
 
 ## Buyer Partnership Strategy
 
@@ -327,12 +329,17 @@ Start with **gig model** (Option A) for pilot phase. Drivers are hired per route
 | **[11-government-compliance.md](./11-government-compliance.md)** | DENR accreditation, RA 6969 compliance details. |
 | **[13-implementation-roadmap.md](./13-implementation-roadmap.md)** | Overall project timeline — Phase 1/2/3 mapping. |
 
+## Resolved Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| **Monetization model** | **Percentage margin (15%)** | Scales with oil prices, aligns incentives with buyers. Team decision — Jul 2026. |
+| **Driver model** | **Salary + bonus (Option B)** | Predictable service quality and driver retention. Daily base + per-liter bonus. Team decision — Jul 2026. |
+
 ## Open Questions (For Team Discussion)
 
 | Question | Options |
 |----------|---------|
 | **Points tier** | Recommended: 20 pts/L (10% off) / Conservative: 10 pts/L / Aggressive: 30 pts/L |
-| **Monetization model** | Fixed margin (₱5/L) / Percentage (15%) / Subscription + volume fee |
-| **Driver model** | Gig / Salary + bonus / Phased |
 | **First buyer to approach** | Chemrez / RMC / Kobkiat / All in parallel |
 | **Backup plan (no partner funding)** | Conservative (A+B+C) / Strong (A+B+C+D) / A+B+E / A+E+F / C+D+F / Ultimate (all levers) |
