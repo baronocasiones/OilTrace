@@ -126,31 +126,73 @@ The business **performs best** with the points model, but a viable cash-based ba
 
 The primary model relies on **partner-funded points** — partners absorb the discount as a marketing cost, OilTrace pays nothing. This generates ~₱1,190/route profit. However, at the startup/hackathon phase, partnerships may not yet be secured. Judges will question this dependency. A viable backup plan demonstrates that the business is not fragile.
 
-### The Levers (Can Be Combined)
+### Honest Assessment: What Works and What Doesn't
 
-| Lever | Code | How It Works | Impact |
-|-------|------|-------------|--------|
-| **Buyer premium** | A | Charge buyers 10-15% more for blockchain-verified, sensor-graded oil. SAF/biodiesel producers need auditable chain-of-custody — a real market need they'll pay for. | +₱180-280/route |
-| **Lower cash payout** | B | Pay karinderyas ₱12-15/L cash instead of ₱20/L. Below the informal ₱15-30/kg rate, but compensated by scheduled pickup (no waiting), no negotiation, and legitimacy (oil goes to biofuel, not counterfeit cooking oil). | Saves ₱375-600/route |
-| **Route density** | C | 20 stops instead of 15, 100L instead of 75L. Same driver cost, more volume. | +₱600/route revenue |
-| **Grade-optimized corridors** | D | Start in QC areas where karinderyas do lighter frying (stews, rice toppings, less deep frying) — shifts grade mix toward Premium/Standard (e.g., 30/45/25 instead of 20/40/40). | +₱200-400/route |
-| **First-party points** | E | Issue OilTrace-branded points at ₱1-2/L internal cost instead of ₱15-20/L cash. Keeps karinderyas in the points ecosystem without external partners. | Saves ₱900-1,350/route vs cash |
-| **Hybrid payout** | F | Pay Premium oil (higher margin) in cash, Standard/Low oil in first-party points. Optimizes cash usage where margin is highest. | Balances cash and points |
+Before choosing a backup, it's worth being clear about which levers are backed by real data and which are speculative.
 
-### Backup Tiers (For Team Discussion)
+| Lever | Data confidence | Why |
+|-------|----------------|-----|
+| **C — Route density (100L)** | ✅ **High** | Cargo ebikes in PH have 200kg+ payload (research confirmed). QC target barangays are dense. Food delivery ebikes operate 30-50km/day — a 20-stop route fits easily. |
+| **A — Buyer premium (5%)** | ⚠️ **Medium** | Global research confirms blockchain traceability is growing in demand. But PH commodity buyers (Chemrez) buy UCO as bulk feedstock — 10-15% premium is optimistic. 5% is defensible if you can show auditable chain-of-custody. |
+| **B — Cash payout (₱15/L)** | ⚠️ **Medium** | Informal collectors pay ₱15-30/kg. ₱15/L is at the floor. Karinderyas will accept it paired with scheduled pickup + legitimacy, but ₱12/L is too low to compete. |
+| **F — Differentiated cash by grade** | ⚠️ **Medium** | Paying different rates per grade makes economic sense — but needs clear communication to karinderyas. |
+| **D — Grade-optimized corridors** | ❌ **Low** | No PH-specific TPM data exists anywhere. The entire grade estimate (20/40/40) is extrapolated from Indian/Singaporean street food. Trying to identify "lighter frying" corridors without actual TPM measurements is a guess. |
+| **E — First-party points** | ⚠️ **Weaker than modeled** | "First-party points" mean OilTrace issues its own points — but what do karinderyas redeem them for? Without partner stores, options are: (a) deferred cash payout later (saves nothing), (b) OilTrace buys goods in bulk to resell (adds complexity), or (c) stackable points that future partners honor later. None of these save ₱13-18/L the way the original model assumed. |
 
-| Tier | Levers Combined | Per-Route Net | Notes |
-|------|----------------|---------------|-------|
-| **Conservative** | A (+10%) + B (₱15/L) + C (100L) | ~₱458 | Modest but positive. Credible to judges — shows you've done the math. |
-| **Strong** | A (+15%) + B (₱12/L) + C (100L) + D (30/45/25 mix) | ~₱1,300 | Stronger profit but requires grade-optimized corridor selection. |
-| **Combination A+B+E** | A (+10%) + B (₱15/L) + E (first-party points for Low grade) | ~₱800 | Pay Premium/Standard in cash, Low grade in first-party points. |
-| **Combination A+E+F** | A (+10%) + E (first-party points) + F (cash for Premium, points for Standard/Low) | ~₱1,055 | Minimizes cash outlay. Uses points for 80% of volume at low internal cost. |
-| **Combination C+D+F** | C (100L) + D (grade-optimized) + F (hybrid payout) | ~₱1,100 | Highest volume + best grade mix + smart cash allocation. |
-| **Ultimate (all levers)** | A (+15%) + B (₱12/L) + C (100L) + D (30/45/25) + F (hybrid) | ~₱1,900 | Maximum scenario. Not all levers may be achievable simultaneously. |
+**Key takeaway:** The strongest levers are **C (route density)** and a conservative **A (5% buyer premium)**. Everything else has significant caveats.
 
-### How to Present This to Judges
+### The Levers (Revised)
 
-> "Our primary model uses partner-funded points, which makes the economics strongly positive at ~₱1,190/route. But we've modeled a cash-based backup that requires no partnerships — by combining buyer premiums for blockchain traceability, optimized route density, and grade-targeted corridor selection, we remain profitable even without a single partner signed. The partnerships are a growth accelerator, not a dependency."
+| Lever | Code | Realistic Impact | Data Basis |
+|-------|------|-----------------|------------|
+| **Route density** | C | +₱600/route (100L instead of 75L, same driver cost) | Cargo ebike payload + QC density confirmed |
+| **Buyer premium (conservative)** | A | +₱120-180/route (5% premium, not 10-15%) | Global traceability demand exists but PH commodity market is price-sensitive |
+| **Cash payout (floor rate)** | B | ₱15/L to all grades. Saves ₱375/route vs ₱20/L | At the low end of informal ₱15-30/kg range |
+| **Differentiated cash by grade** | F | ₱15/L Premium, ₱12/L Standard, ₱8/L Low. Total ₱1,100/route vs ₱2,000 at flat ₱20/L | Matches cash outlay to buyer value per grade |
+| **First-party points** | E | ₱5-8/L effective cost (not ₱1-2/L) — points need real redemption value | Without external partners, you're effectively running delayed cash or a bulk-purchase program |
+
+### Backup Options (Revised for Honesty)
+
+| Option | Levers | Revenue | Cash to karinderya | Other costs | Net/route | Verdict |
+|--------|--------|---------|-------------------|-------------|-----------|---------|
+| **C + B** | 100L + ₱15/L flat cash | ₱2,400 (no premium) | ₱1,500 | ₱610 | **₱290** | Positive but thin. ₱2.90/L margin. One bad route and it's gone. |
+| **C + B + A** | +5% buyer premium | ₱2,520 | ₱1,500 | ₱610 | **₱410** | Modest but safer. ₱4.10/L buffer. |
+| **C + F + A** | 100L + differentiated cash (₱15/₱12/₱8) + 5% premium | ₱2,520 | ₱1,100 | ₱610 | **₱810** | Healthiest margin. Pays less for Low-grade (which has least buyer value). Risks losing Low-grade karinderyas to informal collectors. |
+
+### Recommended Backup: C + F + A (Route Density + Differentiated Cash + 5% Buyer Premium)
+
+**Why this one:**
+
+| Reason | Data backing |
+|--------|-------------|
+| **Route density** is the most certain lever | Cargo ebikes confirmed at 200kg+ payload. QC density supports 20-stop routes. |
+| **Differentiated cash** matches payout to actual oil value | Low-grade oil sells for ₱15/L to buyers — paying ₱8/L for it leaves margin. Premium oil sells for ₱40/L — paying ₱15/L for it still leaves ₱25/L. |
+| **5% buyer premium** is conservative enough to be believable | Blockchain traceability is a real global trend, but PH buyers won't pay 10-15% for it at this stage. |
+| **No reliance on grade-optimized corridors** | We have zero PH TPM data. This plan works with the 20/40/40 estimate as-is. |
+
+**The numbers:**
+
+| | Volume | Buyer price (+5%) | Cash to karinderya | OilTrace margin/L |
+|---|---|---|---|---|
+| Premium | 20L | ₱840 (₱42/L) | ₱300 (₱15/L) | ₱27/L |
+| Standard | 40L | ₱1,050 (₱26.25/L) | ₱480 (₱12/L) | ₱14.25/L |
+| Low | 40L | ₱630 (₱15.75/L) | ₱320 (₱8/L) | ₱7.75/L |
+| **Total** | **100L** | **₱2,520** | **₱1,100** | **₱810 net (₱610 driver+ebike deducted)** |
+
+**The risk:** Paying ₱8/L for Low-grade oil may drive those karinderyas to informal collectors (₱15-30/kg). Mitigation: emphasize free scheduled pickup + legitimacy of proper disposal. If Low-grade karinderyas churn, Standard and Premium still subsidize the route.
+
+**The backup pitch (honest version):**
+
+> "Our primary model uses partner-funded points at ₱0 cost to us — that's the main engine at ₱1,190/route. But if partnerships take longer to secure, our cash-based backup uses three things we can control: higher route density per ebike, cash payouts that match each grade's actual buyer value, and a modest premium for blockchain traceability. It's thinner — ₱810/route instead of ₱1,190 — but it doesn't depend on anyone else's sign-off."
+
+### What This Means for Your Pitch to Judges
+
+The honest answer to "what if you don't get partners?" is:
+
+- **The backup works**, but margins are thinner than the primary model
+- **It's not a magic bullet** — it's operational discipline (route density + smart payout structure)
+- **It buys time** — enough to operate while signing the partnerships that unlock the full ₱1,190/route
+- **The worst case is ₱410/route** (flat ₱15/L cash + 5% premium + 100L density), which still covers costs and keeps the business alive
 
 ## Per-Route Economics
 
@@ -342,4 +384,4 @@ Salary + bonus provides predictable service quality and driver retention from th
 
 | Question | Options |
 |----------|---------|
-| **Backup plan (no partner funding)** | Conservative (A+B+C) / Strong (A+B+C+D) / A+B+E / A+E+F / C+D+F / Ultimate (all levers) |
+| **Backup plan (no partner funding)** | C+B (₱290/route — thin) / C+B+A (₱410/route — modest) / **Recommended: C+F+A (₱810/route — healthiest)** |
