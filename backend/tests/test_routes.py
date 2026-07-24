@@ -6,16 +6,14 @@ edge cases (single stop, zero stops), polyline generation.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
-import json
 
 
 class TestRouteOptimization:
     """Route engine business logic."""
 
-    async def test_route_returns_optimal_order(self, client):
+    async def test_route_returns_optimal_order(self, driver_client):
         """Multiple stops → optimized ordering."""
-        resp = await client.post(
+        resp = await driver_client.post(
             "/routes/optimize",
             json={
                 "origin_lat": 14.5800,
@@ -26,7 +24,6 @@ class TestRouteOptimization:
                     {"lat": 14.5750, "lng": 121.0350, "id": "stop-3"},
                 ]
             },
-            headers={"Authorization": "Bearer mock-driver-jwt"}
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -35,9 +32,9 @@ class TestRouteOptimization:
         assert "total_distance_km" in data
         assert "total_duration_min" in data
 
-    async def test_route_with_single_stop(self, client):
+    async def test_route_with_single_stop(self, driver_client):
         """Edge case: only one collection pending → direct route."""
-        resp = await client.post(
+        resp = await driver_client.post(
             "/routes/optimize",
             json={
                 "origin_lat": 14.5800,
@@ -46,23 +43,21 @@ class TestRouteOptimization:
                     {"lat": 14.5832, "lng": 121.0409, "id": "stop-1"},
                 ]
             },
-            headers={"Authorization": "Bearer mock-driver-jwt"}
         )
         assert resp.status_code == 200
         data = resp.json()
         assert len(data["waypoints"]) == 1
-        assert data["waypoints"][0]["order"] == 1
+        assert data["waypoints"][0]["stop"] == 1
 
-    async def test_route_with_zero_stops(self, client):
+    async def test_route_with_zero_stops(self, driver_client):
         """No pending collections → empty route."""
-        resp = await client.post(
+        resp = await driver_client.post(
             "/routes/optimize",
             json={
                 "origin_lat": 14.5800,
                 "origin_lng": 121.0400,
                 "stops": []
             },
-            headers={"Authorization": "Bearer mock-driver-jwt"}
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -82,16 +77,15 @@ class TestRouteOptimization:
         )
         assert resp.status_code == 401
 
-    async def test_route_consumer_cannot_access(self, client):
+    async def test_route_consumer_cannot_access(self, consumer_client):
         """Consumer JWT → route endpoint → 403."""
-        resp = await client.post(
+        resp = await consumer_client.post(
             "/routes/optimize",
             json={
                 "origin_lat": 14.5800,
                 "origin_lng": 121.0400,
                 "stops": []
             },
-            headers={"Authorization": "Bearer mock-consumer-jwt"}
         )
         assert resp.status_code == 403
 
@@ -174,9 +168,9 @@ class TestOSRMIntegration:
         )
         assert result["fallback_used"] is True
 
-    async def test_route_includes_polyline(self, client):
+    async def test_route_includes_polyline(self, driver_client):
         """Route response includes encoded polyline for map rendering."""
-        resp = await client.post(
+        resp = await driver_client.post(
             "/routes/optimize",
             json={
                 "origin_lat": 14.5800,
@@ -185,7 +179,6 @@ class TestOSRMIntegration:
                     {"lat": 14.5832, "lng": 121.0409, "id": "stop-1"},
                 ]
             },
-            headers={"Authorization": "Bearer mock-driver-jwt"}
         )
         if resp.status_code == 200:
             assert "polyline" in resp.json()

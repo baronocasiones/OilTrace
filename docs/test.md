@@ -19,21 +19,23 @@ cd contract && npm ci && npx hardhat test
 ## Test Layers
 
 ```
-backend/tests/          ~112 tests across 11 files
-├── conftest.py                  Fixtures, DB switching, auth helpers, RLS seed data
-├── test_classification.py       Pure unit — no DB, no HTTP
-├── test_points.py               Pure unit — ledger math and expiry
-├── test_blockchain_service.py   Service tests — mocked Web3.py + poller state machine
-├── test_routes.py               Service tests — mocked OSRM client
-├── test_auth_middleware.py      API tests — JWT, roles, IoT auth, rate limiting
-├── test_collection_api.py       API tests — CRUD, status transitions, role gating
-├── test_push_notifications.py   API tests — token register, send, audit
-├── test_partners.py             API tests — partner CRUD, vouchers, settlement
-├── test_realtime.py             API tests — channel auth, payload validation, throttling
-└── test_rls_boundaries.py       API tests — row-level security isolation (PostgreSQL only)
-
-contract/test/          20+ tests across 1 file
-└── OilTrace.test.ts             Deployment, recordCollection, verifyData, gas benchmark
+backend/tests/          ~200 tests across 16 files
+├── conftest.py                          Fixtures, DB switching, auth helpers, RLS seed data
+├── test_classification.py               Pure unit — no DB, no HTTP
+├── test_points.py                       Pure unit — ledger math and redemption
+├── test_blockchain_service.py           Service tests — mocked Web3.py + poller state machine
+├── test_routes.py                       Service tests — mocked OSRM client
+├── test_auth_middleware.py              API tests — JWT, roles, IoT auth, rate limiting
+├── test_collection_api.py               API tests — CRUD, status transitions, role gating
+├── test_push_notifications.py           API tests — token register, send, audit
+├── test_partners.py                     API tests — partner CRUD, vouchers, settlement
+├── test_realtime.py                     API tests — channel auth, payload validation, throttling
+├── test_rls_boundaries.py               API tests — row-level security isolation (PostgreSQL only)
+├── test_integration_workflows.py        Integration — full lifecycle flows (PG only)
+├── test_integration_data_integrity.py   Integration — FK cascades, constraints (PG only)
+├── test_integration_rate_limiting.py    Integration — rate limit enforcement (PG only)
+├── test_integration_concurrency.py      Integration — race conditions, duplicates (PG only)
+└── test_integration_error_recovery.py   Integration — fallback, error mapping (PG only)
 ```
 
 ---
@@ -103,34 +105,111 @@ async def client(db_session):
 
 All test requests go through this client and hit the actual FastAPI routing/middleware — no `httpx` mocking.
 
-### 4. Auth Helpers
+### 4. Auth Claims
+
+Auth is tested via `Claims` TypedDicts injected as `dependency_overrides` — no real
+Supabase calls. Three claim fixtures generate random UUIDs per role:
 
 ```python
 @pytest.fixture
-def consumer_jwt() -> str:
-    return "mock-consumer-jwt-token"   # Patched in via dependency override
+def consumer_claims() -> Claims:
+    return Claims(
+        sub=str(uuid4()),          # random UUID matching auth.users
+        role="consumer",
+        phone="+639000000001",
+        full_name="Test Consumer",
+    )
 
 @pytest.fixture
-def driver_jwt() -> str:
-    return "mock-driver-jwt-token"
+def driver_claims() -> Claims:
+    return Claims(
+        sub=str(uuid4()),
+        role="driver",
+        phone="+639000000002",
+        full_name="Test Driver",
+    )
 
 @pytest.fixture
-def owner_jwt() -> str:
-    return "mock-owner-jwt-token"
+def owner_claims() -> Claims:
+    return Claims(
+        sub=str(uuid4()),
+        role="owner",
+        phone="+639000000003",
+        full_name="Test Owner",
+    )
 ```
 
-In production, these are Supabase Auth JWTs. In tests, they're placeholder strings that the auth middleware's dependency override interprets as predefined roles. This avoids needing a running Supabase instance.
+### 5. Authenticated HTTP Clients
 
-### 5. RLS Seed Data
+Convenience fixtures that combine an HTTP client + auth override + DB seeding:
 
-The `mock_rls_session` fixture creates two consumers, one driver, and one owner in the database so RLS boundary tests can verify cross-user isolation:
+| Fixture | Role | Seeds DB |
+|---------|------|----------|
+| `consumer_client` | consumer | Profile + Consumer record |
+| `driver_client` | driver | Profile + Driver record |
+| `owner_client` | owner | Profile + Owner record |
 
 ```python
-consumer_a = Consumer(profile_id=consumer_a_id, business_name="Karinderya A")
-consumer_b = Consumer(profile_id=consumer_b_id, business_name="Karinderya B")
-driver = Driver(profile_id=driver_id, status="available")
-owner = Owner(profile_id=owner_id, company_name="OilTrace Corp")
+@pytest_asyncio.fixture
+async def consumer_client(client, consumer_claims, db_session):
+    _seed_profile_and_role(db_session, consumer_claims)
+    app.dependency_overrides[get_current_user] = lambda: consumer_claims
+    yield client
+    app.dependency_overrides.pop(get_current_user, None)
 ```
+
+Routes look up `Consumer`/`Driver`/`Owner` by `profile_id`, so `_seed_profile_and_role`
+creates matching rows before each test:
+
+```python
+def _seed_profile_and_role(db_session, claims):
+    profile = Profile(id=UUID(claims["sub"]), role=claims["role"], ...)
+    db_session.add(profile)
+    if claims["role"] == "consumer":
+        db_session.add(Consumer(profile_id=profile.id, business_name="Test Karinderya"))
+    ...
+```
+
+### 6. Multi-Role Switching (`set_auth`)
+
+For tests that need multiple roles in a single test (e.g., consumer creates → owner assigns):
+
+```python
+@pytest.fixture
+def set_auth(db_session):
+    def _set(claims):
+        _seed_profile_and_role(db_session, claims)     # ensure DB records exist
+        app.dependency_overrides[get_current_user] = lambda: claims
+    yield _set
+    app.dependency_overrides.pop(get_current_user, None)
+
+# Usage:
+async def test_owner_can_assign_driver(self, client, set_auth, consumer_claims, owner_claims):
+    set_auth(consumer_claims)
+    await client.post("/consumers/requests", ...)       # as consumer
+
+    set_auth(owner_claims)
+    await client.put("/owners/requests/{id}/assign", ...)  # as owner
+```
+
+### 7. RLS Seed Data
+
+The `mock_rls_session` fixture creates two consumers, one driver, and one owner in the database so RLS boundary tests can verify cross-user isolation. Returns both Profile UUIDs (for `sub` claims) and record IDs (for FK columns):
+
+```python
+return {
+    "consumer_a_id": consumer_a_id,          # Profile.id (for auth claims)
+    "consumer_b_id": consumer_b_id,
+    "consumer_a_record_id": consumers[0].id,  # Consumer.id (for FK references)
+    "consumer_b_record_id": consumers[1].id,
+    "driver_id": driver_id,
+    "driver_record_id": driver_rec.id,
+    "owner_id": owner_id,
+    "owner_record_id": owner_rec.id,
+}
+```
+
+PostgreSQL enforces FK constraints — `CollectionRequest.consumer_id` and `Collection.consumer_id` reference `Consumer.id`, not `Profile.id`. SQLite ignores this, so the distinction matters only in CI.
 
 ---
 
@@ -178,22 +257,43 @@ assert len(result["tx_hash"]) == 66  # "0x" + 64 hex chars
 
 ### API Tests (full HTTP round-trip)
 
-These use the `client` fixture and test the complete request→middleware→route→service→response pipeline. The database is real (SQLite or Postgres); only external services (Web3, SMS, push) are mocked.
+These use authenticated client fixtures and test the complete
+request→middleware→route→service→response pipeline. The database is real (SQLite
+or Postgres); only external services (Web3, SMS, push) are mocked.
 
-**Examples:** `test_auth_middleware.py`, `test_collection_api.py`, `test_push_notifications.py`
+**Examples:** `test_auth_middleware.py`, `test_collection_api.py`
 
 ```python
-# test_push_notifications.py (API test)
-async def test_register_device_token(self, client):
-    resp = await client.post(
-        "/notifications/register",
-        json={
-            "token": "ExponentPushToken[test-token-123456]",
-            "device_platform": "ios"
-        },
-        headers={"Authorization": "Bearer mock-consumer-jwt"}
+# test_collection_api.py — using authenticated client fixture
+async def test_create_on_demand_request(self, consumer_client):
+    """Consumer creates an on-demand request → status=pending."""
+    resp = await consumer_client.post(
+        "/consumers/requests",
+        json={"request_type": "on_demand", "notes": "Pickup ASAP"},
     )
+    assert resp.status_code == 201
+    assert resp.json()["status"] == "pending"
+```
+
+For tests needing role switching mid-test (e.g., consumer creates → owner assigns):
+
+```python
+async def test_owner_can_assign_driver(self, client, set_auth, consumer_claims, owner_claims):
+    set_auth(consumer_claims)
+    create = await client.post("/consumers/requests", json={"request_type": "on_demand"})
+    req_id = create.json()["id"]
+
+    set_auth(owner_claims)
+    resp = await client.put(f"/owners/requests/{req_id}/assign", json={"driver_id": "..."})
     assert resp.status_code == 200
+```
+
+Use bare `client` (no auth override) to test 401 behavior:
+
+```python
+async def test_no_token_returns_401(self, client):
+    resp = await client.get("/consumers/requests")
+    assert resp.status_code == 401
 ```
 
 ---
@@ -211,20 +311,74 @@ async def test_register_device_token(self, client):
 | Edge cases | 4 | Zero address, empty geohash, duplicate record ID, zero volume |
 | Gas benchmark | 1 | Records gas cost of `recordCollection` for optimization reference |
 
-### Backend Tests — ~112 tests
+### Backend Tests — ~200 tests (114 pass / 87 skipped on SQLite; 98 pass + 2 xfailed on PG)
 
 | File | Tests | What it validates | Category |
 |------|-------|-------------------|----------|
 | `test_classification.py` | 12 | TPM boundaries (19.9/20.0/29.9/30.0), negative TPM error, zero/edge values, per-grade descriptions, 10K-call throughput benchmark | Pure unit |
-| `test_points.py` | 14 | Earn calculation (10 pts/L), redemption deduction, insufficient balance → 400, 90-day expiry, running ledger integrity across 5+ transactions | Pure unit |
+| `test_points.py` | 15 | Earn calculation (10 pts/L), redemption deduction, insufficient balance → 400, running ledger integrity across 5+ transactions | Pure unit |
 | `test_blockchain_service.py` | 15 | Web3.py write with correct args, contract-owner-only guard, RPC connection failure, verification endpoint, poller state machine: confirmed/failed/stale/RPC recovery/retry count max | Service |
-| `test_routes.py` | 8 | Multi-stop/single-stop/zero-stop routes, OSRM success response parsing, OSRM timeout fallback, OSRM HTTP error fallback, nearest-neighbor ordering correctness | Service |
-| `test_auth_middleware.py` | 16 | No-auth → 401, malformed/expired/wrong-role JWT → 401, consumer/driver/owner role enforcement on protected endpoints, IoT device credentials (valid/invalid/missing), rate limiting headers | API |
-| `test_collection_api.py` | 12 | Create collection request, driver assignment (role-gated), TPM validation on recording, status transitions: pending→assigned→in_progress→completed, cancel from wrong role → 403, completed→cancel → 400 | API |
-| `test_push_notifications.py` | 10 | Register/unregister device token, send on assignment/completion/expiry, malformed token → 400, rate limiting (burst of 20), notification audit log for owner | API |
+| `test_routes.py` | 11 | Multi-stop/single-stop/zero-stop routes, OSRM success response parsing, OSRM timeout fallback, OSRM HTTP error fallback, nearest-neighbor ordering correctness, polyline in response, auth required (401), role enforcement (consumer → 403) | Service |
+| `test_auth_middleware.py` | 14 | No-auth → 401, empty token → 401, any token without override → 401, consumer/driver/owner role enforcement (403), unauthenticated request → 401, IoT auth/reading stubbed (404), rate limiter active | API |
+| `test_collection_api.py` | 21 | Create on-demand/scheduled request, list own, get single, 404 for nonexistent, driver assign (owner can/consumer cannot/driver cannot), record collection with/without request, TPM validation (out-of-range, negative), route retrieval with seeded data (waypoints key, enriched consumer info), status transitions (valid/invalid/completed cancel) | API |
+| `test_push_notifications.py` | 9 | Register/unregister device token, send on assignment/completion, malformed token → 400, rate limiting (burst of 20), notification audit log for owner | API |
 | `test_partners.py` | 8 | Create/list partners (owner-only), voucher code format (`OIL-XXXXXXXX`), QR data format (`oiltrace://voucher/...`), expiry display, settlement amount math | API |
-| `test_realtime.py` | 8 | Channel authorization: driver subscribes OK, consumer can subscribe to assigned driver, consumer rejected for unassigned driver, unauthenticated → 401, payload field validation, rate limit after 10 updates/second, disconnect cleanup | API |
-| `test_rls_boundaries.py` | 9 | Consumer A can't see Consumer B's requests, driver sees only their assigned requests, owner sees all, unauthenticated → empty, public blockchain records accessible without auth, own profile always readable (PostgreSQL only) | API (PG) |
+| `test_realtime.py` | 10 | Channel authorization (owner all, driver own only, consumer none), location payload format, rate limiting (5s throttle), driver offline status, disconnect handling, broadcast to nonexistent channel | API |
+| `test_rls_boundaries.py` | 9 | Consumer isolation (requests, collections, by-ID access), driver isolation (assigned-only, earnings, consumer list), owner bypass (all collections, driver locations), unauthenticated block | API (PG) |
+| `test_integration_workflows.py` | ~36 | See "Integration Tests" section below | Integration (PG) |
+| `test_integration_data_integrity.py` | ~22 | See "Integration Tests" section below | Integration (PG) |
+| `test_integration_rate_limiting.py` | ~8 | See "Integration Tests" section below | Integration (PG) |
+| `test_integration_concurrency.py` | ~18 | See "Integration Tests" section below; 2 xfailed (asyncpg session sharing) | Integration (PG) |
+| `test_integration_error_recovery.py` | ~18 | See "Integration Tests" section below | Integration (PG) |
+
+---
+
+## Integration Tests (PostgreSQL only)
+
+Five new integration test files exercise multi-step workflows, data integrity,
+rate limiting, concurrency, and error recovery. These require `OILTRACE_TEST_DB=postgres`.
+
+```
+backend/tests/          +5 files, ~95 tests
+├── test_integration_workflows.py       Full lifecycle flows
+├── test_integration_data_integrity.py  FK cascades, CHECK constraints, uniqueness
+├── test_integration_rate_limiting.py   SlowAPI 30/min and 100/min limits
+├── test_integration_concurrency.py     Race conditions, duplicate ops
+└── test_integration_error_recovery.py  OSRM fallback, HTTP error mapping, dead code
+```
+
+### Integration Test Fixtures (in `conftest.py`)
+
+| Fixture | Purpose |
+|---------|---------|
+| `needs_postgres` | Marker — skips test unless `OILTRACE_TEST_DB=postgres` |
+| `seed_consumer_with_location` | Consumer + lat/lng for route tests |
+| `seed_collection_scenario` | Consumer + driver + assigned request + collection full scenario |
+| `mock_osrm_success` | Monkeypatches `_fetch_osrm` to return structured success data |
+| `mock_osrm_failure` | Monkeypatches `_fetch_osrm` to raise `HTTPError` |
+| `mock_expo_push_success` | Monkeypatches Expo push client to succeed |
+| `mock_expo_push_failure` | Monkeypatches Expo push client to fail |
+
+### Integration Test Coverage
+
+| File | Classes | ~Tests | What it validates |
+|------|---------|--------|-------------------|
+| `test_integration_workflows.py` | 6 | 36 | Consumer create → owner assign → driver collect → points → redeem; ad-hoc collect; driver route (origin fallback, 400 when no location); route optimize (enriched waypoints, polyline, `fallback_used`); notification register/unregister |
+| `test_integration_data_integrity.py` | 5 | 22 | FK cascade on driver delete, CHECK constraints (TPM 0-30, volume > 0, points > 0), PushDevice unique token, PointsLedger balance consistency, parse_uuid fallback behavior |
+| `test_integration_rate_limiting.py` | 3 | 8 | 30 req/min budget on `POST /routes/optimize`, 429 response structure (uses `error` key, not `detail`), 100/min global limit, health endpoint exempt, rate limit headers. Note: two `Limiter` instances exist — middleware (`app.state.limiter`) and decorator wrapper on the endpoint (`_limiter` in routes.py). Both must be toggled to disable. |
+| `test_integration_concurrency.py` | 4 | 15-18 (2 xfailed) | Two drivers collect same request (both succeed — no dedup), concurrent collections diff consumers, concurrent 60-point redemptions from 100 balance (no double-spend guard), duplicate status transitions, Driver B updating Driver A's request (ownership gap documented), duplicate consumer requests create distinct records, duplicate collection same request_id, duplicate push token changes owner. Two tests xfailed: `test_two_drivers_collect_same_request_id` and `test_concurrent_collections_different_consumers` — `asyncio.gather` shares one `db_session` which asyncpg rejects on concurrent `commit()`. |
+| `test_integration_error_recovery.py` | 4 | 14-18 | OSRM fallback to nearest-neighbor (polyline present in success, waypoints key is `request_id`), push failure logged not raised, wrong role → 403 (parametrized), nonexistent endpoint → 404, malformed JSON → 422, missing auth → 401, invalid UUID → 422, dead code existence checks (BlockchainService, award_points, PushService) |
+
+### Known Bugs and Security Gaps Found
+
+| Bug | File | Impact | Status |
+|-----|------|--------|--------|
+| `BlockchainService` exists but is never called from any route | `services/blockchain.py` | Dead code — no blockchain recording at all | Still open |
+| `POST /drivers/collect` has no idempotency guard on `request_id` | `collections.py` | Same request can be collected multiple times | Still open |
+| `driver_collect()` returns `points_awarded` but never called `award_points()` | `collections.py` | Consumer points were never persisted | **Fixed** — now calls `award_points()` at line 356 |
+| `CollectionRequest.driver_id` FK had no `ondelete` rule | `models.py` | Deleting a driver left orphan references | **Fixed** — now `ondelete="SET NULL"` |
+| `PUT /drivers/requests/{id}/status` lacked `req.driver_id == driver.id` ownership check | `collections.py` | Any driver could update any request | **Fixed** — ownership guard added at line 254 |
+| `PUT /notifications/unregister` lacked `profile_id` filter | `notifications.py` | Cross-profile deactivation possible | **Fixed** — now filters by both `push_token` and `profile_id` |
 
 ---
 
@@ -236,6 +390,7 @@ async def test_register_device_token(self, client):
 | `DATABASE_URL` | `sqlite:///./test.db` | Custom connection string when using PG directly | Advanced usage |
 | `ETH_RPC_URL` | `http://localhost:8545` | Sepolia RPC endpoint for Web3.py tests | `test_blockchain_service.py` |
 | `SUPABASE_URL` | `http://localhost:54321` | Supabase project URL for Realtime channel tests | `test_realtime.py` |
+| `OSRM_BASE_URL` | `https://router.project-osrm.org` | OSRM server — change for self-hosted | `test_routes.py` (via `route_engine.py`) |
 
 ---
 
@@ -254,16 +409,19 @@ Caches `node_modules` via npm.
 
 ### `.github/workflows/backend.yml`
 
-| Trigger | Job | Timeout |
-|---------|-----|---------|
-| Any push touching `backend/**` (any branch) | `pytest tests/ -v` (Python 3.11) | 10 min |
-| PR to `main` touching `backend/**` | Same | 10 min |
+| Trigger | Jobs | Timeout |
+|---------|------|---------|
+| Any push touching `backend/**` (any branch) | **Unit & API tests (SQLite)** + **Integration tests (PostgreSQL)** | 10 min each |
+| PR to `main` touching `backend/**` | Same | 10 min each |
 
-Runs all backend tests in SQLite mode. RLS boundary tests run only if `OILTRACE_TEST_DB=postgres` is set. Caches pip packages.
+Two jobs run in parallel:
 
-### What doesn't fire CI
+1. **Unit & API tests (SQLite)** — `pytest tests/ -v` ignoring all 6 RLS/integration files. Fast (~30s CI), no external deps.
+2. **Integration tests (PostgreSQL)** — runs against a `postgres:16-alpine` service container with `-k "rls_boundaries or integration"`. Tests RLS isolation, full workflows, data integrity, rate limiting, concurrency, and error recovery. Uses `psycopg2-binary`.
 
-Pushing changes to `docs/`, `hardware/`, `mobile/`, root `.md` files, or anything outside `backend/` and `contract/` — **no CI runs**. Clean green checks across the board.
+Caches pip packages via `actions/setup-python@v5`.
+
+Note: Changes to `docs/`, `mobile/`, `hardware/`, or root `.md` files do **not** trigger any CI.
 
 ---
 
@@ -281,10 +439,15 @@ def test_some_business_logic(self):
     from app.services.my_service import calculate
     assert calculate(5) == 25
 
-# API test — just use client
-async def test_my_endpoint(self, client):
-    resp = await client.get("/my/endpoint", headers=auth_header)
+# API test — use role-specific client
+async def test_my_endpoint(self, consumer_client):
+    resp = await consumer_client.get("/my/endpoint")
     assert resp.status_code == 200
+
+# API test — bare client for 401 testing
+async def test_requires_auth(self, client):
+    resp = await client.get("/my/endpoint")
+    assert resp.status_code == 401
 ```
 
 ### Contract test (new function)
@@ -299,6 +462,8 @@ async def test_my_endpoint(self, client):
 
 - **RLS tests require PostgreSQL** — skipped automatically with a message when on SQLite
 - **Blockchain tests use mocked Web3.py** — no actual Sepolia RPC calls during unit tests
-- **Route tests use mocked OSRM responses** — no live OSRM calls; integration tests would need a real endpoint
+- **Route engine unit tests use mocked OSRM responses** (`_fetch_osrm` monkeypatched); API tests hit the real `POST /routes/optimize` endpoint which calls OSRM or falls back to haversine
 - **Async tests** use `pytest-asyncio` — test functions must be `async def` or they won't await properly
-- **Supabase Auth** is not tested at the unit level — the JWT verification is replaced by a mock dependency; full auth flow requires Supabase local dev or staging
+- **Supabase Auth** is not tested at the unit level — JWT verification is replaced by `dependency_overrides` in test mode; full auth flow requires Supabase local dev or staging
+- **Two concurrent collection tests are `xfail`'d** — `test_two_drivers_collect_same_request_id` and `test_concurrent_collections_different_consumers` use `asyncio.gather` with a shared `db_session`; asyncpg rejects concurrent `commit()` with `IllegalStateChangeError`. They pass with SQLite. Fix requires per-task sessions.
+- **Rate limiter uses two `Limiter` instances** — `app.state.limiter` (middleware) and `routes._limiter` (decorator wrapper). Tests that disable rate limiting must toggle both. The decorator's `async_wrapper` checks limits *inside* the endpoint, independently of the middleware.

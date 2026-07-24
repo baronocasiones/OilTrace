@@ -19,11 +19,16 @@ Production:  https://oiltrace.onrender.com/api/v1
 
 ### Auth
 
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| POST | `/auth/register` | None | Register user via Supabase Auth (phone/email/OTP) |
-| POST | `/auth/login` | None | Login via Supabase |
-| GET | `/auth/profile` | JWT | Get current user's profile |
+All auth endpoints live under `/api/v1/auth/`. Authentication is handled via
+Supabase Auth with phone OTP as the primary method. The FastAPI middleware
+verifies JWTs via `supabase.auth.get_user()` and enforces roles via the
+`require_role()` dependency factory.
+
+| Method | Endpoint | Auth | Description | Status |
+|--------|----------|------|-------------|--------|
+| POST | `/auth/register` | None | Create user via Supabase Auth admin API | ✅ Implemented |
+| POST | `/auth/login` | None | Authenticate with phone + password | ✅ Implemented |
+| GET | `/auth/profile` | JWT | Return current user's claims from JWT | ✅ Implemented |
 
 **POST /auth/register**
 ```json
@@ -35,12 +40,51 @@ Production:  https://oiltrace.onrender.com/api/v1
 }
 ```
 
-**Response:**
+Register uses the Supabase service role key to create users with `user_metadata`
+containing the `role` field. A DB trigger (`handle_new_user`) auto-creates the
+corresponding `profiles` row.
+
+**Response (201):**
 ```json
 {
-  "access_token": "eyJ...",
-  "refresh_token": "...",
+  "access_token": "",
+  "refresh_token": "",
   "user": { "id": "uuid", "phone": "+639123456789", "role": "consumer" }
+}
+```
+
+> Note: `access_token` is empty on registration — user must log in to obtain a token.
+
+**POST /auth/login**
+```json
+{
+  "phone": "+639123456789",
+  "password": "temporary-password"
+}
+```
+
+**Response (200):**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+  "user": { "id": "uuid", "phone": "+639123456789", "role": "consumer" }
+}
+```
+
+Uses `supabase.auth.sign_in_with_password()`. Returns the Supabase session tokens.
+
+**GET /auth/profile**
+
+Requires `Authorization: Bearer <token>` header. Returns the claims embedded
+in the JWT:
+
+```json
+{
+  "sub": "uuid",
+  "role": "consumer",
+  "phone": "+639123456789",
+  "full_name": "Maria Santos"
 }
 ```
 
@@ -116,7 +160,7 @@ Production:  https://oiltrace.onrender.com/api/v1
 **GET /drivers/route?pending_only=true**
 ```json
 {
-  "route": [
+  "waypoints": [
     {
       "stop": 1,
       "request_id": "uuid",
@@ -124,7 +168,7 @@ Production:  https://oiltrace.onrender.com/api/v1
       "address": "123 Rizal St, Barangay 5",
       "latitude": 14.5832,
       "longitude": 121.0409,
-      "estimated_arrival": "10:15 AM",
+      "estimated_arrival": "8 min",
       "distance_from_prev": 1.2
     },
     {
@@ -134,7 +178,7 @@ Production:  https://oiltrace.onrender.com/api/v1
       "address": "456 Mabini Ave",
       "latitude": 14.5901,
       "longitude": 121.0450,
-      "estimated_arrival": "10:30 AM",
+      "estimated_arrival": "15 min",
       "distance_from_prev": 0.8
     }
   ],
@@ -142,6 +186,8 @@ Production:  https://oiltrace.onrender.com/api/v1
   "total_duration_min": 35
 }
 ```
+
+Returns `400` with `LOCATION_UNAVAILABLE` if the driver has no location set and no pending requests exist to infer an origin.
 
 ### Owner Endpoints
 
@@ -295,9 +341,14 @@ Production:  https://oiltrace.onrender.com/api/v1
 
 ## Route APIs
 
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| POST | `/routes/optimize` | JWT | Get optimized multi-stop route |
+| Method | Endpoint | Auth | Rate Limit | Description |
+|--------|----------|------|------------|-------------|
+| POST | `/routes/optimize` | Driver JWT | 30 req/min | Get optimized multi-stop route (generic — accepts origin + stops) |
+| GET | `/drivers/route` | Driver JWT | — | Get driver's personalized route (auto-fetches pending requests from DB) |
+
+Both endpoints are **implemented** (`app/routes/routes.py` + `app/routes/collections.py`).
+
+The `POST /routes/optimize` endpoint returns a `fallback_used` boolean indicating whether OSRM was unavailable and the haversine fallback was used.
 
 **POST /routes/optimize**
 ```json
